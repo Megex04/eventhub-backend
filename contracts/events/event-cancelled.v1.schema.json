@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/event-cancelled.v1.schema.json",
+  "title": "EventCancelled v1",
+  "description": "Un evento fue cancelado. booking-service cancela reservas activas; notification-service avisa. Routing key: `catalog.event.cancelled.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "EventCancelled"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "catalog-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "reason",
+            "cancelledAt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 3
+            },
+            "cancelledAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

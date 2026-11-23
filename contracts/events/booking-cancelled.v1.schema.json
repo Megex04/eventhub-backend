@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/booking-cancelled.v1.schema.json",
+  "title": "BookingCancelled v1",
+  "description": "Reserva cancelada por el usuario o por cancelacion del evento; inventario liberado. Routing key: `booking.booking.cancelled.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "BookingCancelled"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "booking-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "bookingId",
+            "userId",
+            "eventId",
+            "reason",
+            "cancelledAt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "userId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "USER_REQUEST",
+                "EVENT_CANCELLED"
+              ]
+            },
+            "cancelledAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

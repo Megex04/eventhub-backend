@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/envelope.v1.schema.json",
+  "title": "Event envelope v1",
+  "description": "Sobre comun de todos los mensajes. `messageId` identifica el mensaje (idempotencia en consumidores); los ids de negocio viajan en `data`.",
+  "type": "object",
+  "required": [
+    "messageId",
+    "type",
+    "version",
+    "occurredAt",
+    "correlationId",
+    "producer",
+    "data"
+  ],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z]+$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "producer": {
+      "type": "string",
+      "enum": [
+        "catalog-service",
+        "booking-service",
+        "notification-service"
+      ]
+    },
+    "data": {
+      "type": "object"
+    }
+  }
+}

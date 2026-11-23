@@ -1,0 +1,476 @@
+openapi: 3.0.3
+info:
+  title: EventHub - Catalog API
+  version: 1.0.0
+  description: |
+    API del `catalog-service`. Fuente de verdad **contract-first**: los controllers
+    implementan las interfaces generadas desde este archivo.
+
+    Reglas de negocio relevantes:
+    - Un evento nace en `DRAFT`. Solo en `DRAFT` se puede editar o eliminar, y gestionar zonas.
+    - `publish` exige al menos una zona, `startsAt` en el futuro y `endsAt > startsAt`.
+    - Una vez `PUBLISHED`, las zonas son inmutables; solo se puede `reschedule` o `cancel`.
+    - `CANCELLED` es un estado terminal.
+    - Fechas en ISO-8601 UTC. Importes como string decimal con 2 decimales (nunca float).
+servers:
+  - url: http://localhost:8081
+    description: Local
+tags:
+  - name: Events
+  - name: Zones
+  - name: Lifecycle
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/events:
+    get:
+      tags: [Events]
+      operationId: listEvents
+      summary: Listar eventos (publico)
+      description: Sin token solo devuelve eventos `PUBLISHED`. Un ORGANIZER puede filtrar por `status` y `mine`.
+      security: []
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/EventStatus' }
+        - name: q
+          in: query
+          description: Busqueda por titulo o venue
+          schema: { type: string, maxLength: 100 }
+        - name: from
+          in: query
+          description: Eventos que empiezan desde esta fecha (UTC)
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: Eventos que empiezan hasta esta fecha (UTC)
+          schema: { type: string, format: date-time }
+        - name: mine
+          in: query
+          description: Solo eventos del organizador autenticado (requiere token)
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [startsAt, -startsAt, title, -title]
+            default: startsAt
+      responses:
+        '200':
+          description: Pagina de eventos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [Events]
+      operationId: createEvent
+      summary: Crear evento en DRAFT
+      description: Requiere rol `ORGANIZER`. El `organizerId` se toma del claim `sub` del JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEventRequest' }
+      responses:
+        '201':
+          description: Evento creado
+          headers:
+            Location:
+              schema: { type: string, format: uri-reference }
+              description: URL del evento creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/events/{eventId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    get:
+      tags: [Events]
+      operationId: getEvent
+      summary: Obtener detalle de un evento
+      description: Un evento que no esta `PUBLISHED` solo es visible para su organizador (si no, 404).
+      security: []
+      responses:
+        '200':
+          description: Detalle del evento
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Events]
+      operationId: updateEvent
+      summary: Actualizar datos de un evento (solo DRAFT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEventRequest' }
+      responses:
+        '200':
+          description: Evento actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Events]
+      operationId: deleteEvent
+      summary: Eliminar un evento (solo DRAFT)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/events/{eventId}/zones:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    post:
+      tags: [Zones]
+      operationId: addZone
+      summary: Agregar zona de entradas (solo DRAFT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ZoneRequest' }
+      responses:
+        '201':
+          description: Zona creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketZone' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/events/{eventId}/zones/{zoneId}:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+      - $ref: '#/components/parameters/ZoneId'
+    put:
+      tags: [Zones]
+      operationId: updateZone
+      summary: Actualizar zona (solo DRAFT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ZoneRequest' }
+      responses:
+        '200':
+          description: Zona actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketZone' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Zones]
+      operationId: removeZone
+      summary: Eliminar zona (solo DRAFT)
+      responses:
+        '204': { description: Eliminada }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/events/{eventId}/publish:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    post:
+      tags: [Lifecycle]
+      operationId: publishEvent
+      summary: Publicar evento (DRAFT -> PUBLISHED)
+      description: Emite el evento de dominio `EventPublished`.
+      responses:
+        '200':
+          description: Evento publicado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/v1/events/{eventId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    post:
+      tags: [Lifecycle]
+      operationId: cancelEvent
+      summary: Cancelar evento (PUBLISHED -> CANCELLED)
+      description: Emite `EventCancelled`. Estado terminal.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelEventRequest' }
+      responses:
+        '200':
+          description: Evento cancelado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/events/{eventId}/reschedule:
+    parameters:
+      - $ref: '#/components/parameters/EventId'
+    post:
+      tags: [Lifecycle]
+      operationId: rescheduleEvent
+      summary: Reprogramar evento publicado
+      description: Emite `EventRescheduled`. Solo para eventos `PUBLISHED` que no hayan empezado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RescheduleEventRequest' }
+      responses:
+        '200':
+          description: Evento reprogramado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Keycloak (local) o Microsoft Entra ID (Azure). Rol requerido para escribir `ORGANIZER`.
+
+  parameters:
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ZoneId:
+      name: zoneId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    EventStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, CANCELLED, FINISHED]
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: string
+          pattern: '^\d{1,10}\.\d{2}$'
+          example: '150.00'
+          description: Decimal como string con exactamente 2 decimales
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          example: PEN
+          description: ISO 4217
+
+    ZoneRequest:
+      type: object
+      required: [name, price, capacity]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          example: VIP
+        price: { $ref: '#/components/schemas/Money' }
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          example: 100
+
+    TicketZone:
+      type: object
+      required: [id, name, price, capacity]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        price: { $ref: '#/components/schemas/Money' }
+        capacity: { type: integer }
+
+    CreateEventRequest:
+      type: object
+      required: [title, venue, startsAt, endsAt]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        description: { type: string, maxLength: 4000 }
+        venue: { type: string, minLength: 2, maxLength: 160 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        zones:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ZoneRequest' }
+
+    UpdateEventRequest:
+      type: object
+      required: [title, venue, startsAt, endsAt]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        description: { type: string, maxLength: 4000 }
+        venue: { type: string, minLength: 2, maxLength: 160 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
+    CancelEventRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 500 }
+
+    RescheduleEventRequest:
+      type: object
+      required: [startsAt, endsAt]
+      properties:
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        venue:
+          type: string
+          minLength: 2
+          maxLength: 160
+          description: Opcional. Si se omite se conserva el venue actual.
+
+    EventSummary:
+      type: object
+      required: [id, title, venue, startsAt, endsAt, status]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        venue: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/EventStatus' }
+
+    EventDetail:
+      type: object
+      required: [id, organizerId, title, venue, startsAt, endsAt, status, zones, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        organizerId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        venue: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/EventStatus' }
+        cancelReason:
+          type: string
+          description: Presente solo si `status = CANCELLED`
+        zones:
+          type: array
+          items: { $ref: '#/components/schemas/TicketZone' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    EventPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/EventSummary' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+
+    ProblemDetail:
+      type: object
+      description: RFC 9457 (Problem Details). Content-Type `application/problem+json`.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference, example: 'https://eventhub.dev/problems/invalid-state' }
+        title: { type: string, example: Estado invalido }
+        status: { type: integer, example: 409 }
+        detail: { type: string }
+        instance: { type: string }
+        traceId: { type: string }
+        errors:
+          type: array
+          description: Errores de validacion por campo
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+  responses:
+    BadRequest:
+      description: Peticion invalida (validacion de campos)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Unauthorized:
+      description: Falta token o es invalido
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Forbidden:
+      description: Sin rol ORGANIZER o el evento pertenece a otro organizador
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    NotFound:
+      description: Recurso inexistente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Conflict:
+      description: Transicion de estado invalida para el estado actual
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    UnprocessableEntity:
+      description: Regla de negocio incumplida (ej. publicar sin zonas, fechas invalidas)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }

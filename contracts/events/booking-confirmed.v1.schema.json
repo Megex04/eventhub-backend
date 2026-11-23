@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/booking-confirmed.v1.schema.json",
+  "title": "BookingConfirmed v1",
+  "description": "Reserva confirmada (pago simulado aprobado). Routing key: `booking.booking.confirmed.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "BookingConfirmed"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "booking-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "bookingId",
+            "userId",
+            "eventId",
+            "total",
+            "confirmedAt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "userId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "total": {
+              "$ref": "common.v1.schema.json#/$defs/Money"
+            },
+            "confirmedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

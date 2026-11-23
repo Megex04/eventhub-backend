@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/booking-created.v1.schema.json",
+  "title": "BookingCreated v1",
+  "description": "Reserva creada en PENDING; el inventario queda retenido hasta `expiresAt`. Routing key: `booking.booking.created.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "BookingCreated"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "booking-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "bookingId",
+            "userId",
+            "eventId",
+            "items",
+            "total",
+            "expiresAt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "userId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "zoneId",
+                  "quantity",
+                  "unitPrice"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "zoneId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "unitPrice": {
+                    "$ref": "common.v1.schema.json#/$defs/Money"
+                  }
+                }
+              }
+            },
+            "total": {
+              "$ref": "common.v1.schema.json#/$defs/Money"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

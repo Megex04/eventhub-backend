@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/booking-expired.v1.schema.json",
+  "title": "BookingExpired v1",
+  "description": "Reserva PENDING vencida; el inventario fue liberado. Routing key: `booking.booking.expired.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "BookingExpired"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "booking-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "bookingId",
+            "userId",
+            "eventId",
+            "expiredAt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "userId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expiredAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

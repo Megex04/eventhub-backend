@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/event-rescheduled.v1.schema.json",
+  "title": "EventRescheduled v1",
+  "description": "Un evento publicado cambio de fecha y/o venue. Routing key: `catalog.event.rescheduled.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "EventRescheduled"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "catalog-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "startsAt",
+            "endsAt",
+            "venue"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "startsAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "endsAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "venue": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
