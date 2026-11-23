@@ -1,0 +1,56 @@
+{
+  "realm": "eventhub",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      {
+        "name": "ORGANIZER",
+        "description": "Can create and manage events"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "eventhub-web",
+      "name": "EventHub public test client",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:*"],
+      "webOrigins": ["+"],
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "id": "3f1c2a54-8b7e-4d1a-9c52-6a0f4b7d1e01",
+      "username": "organizer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Olivia",
+      "lastName": "Organizer",
+      "email": "organizer@eventhub.local",
+      "credentials": [
+        { "type": "password", "value": "organizer_dev", "temporary": false }
+      ],
+      "realmRoles": ["ORGANIZER"]
+    },
+    {
+      "id": "9a7d5e12-3c4b-4f60-8e21-b5d0c3a96f02",
+      "username": "attendee",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Arthur",
+      "lastName": "Attendee",
+      "email": "attendee@eventhub.local",
+      "credentials": [
+        { "type": "password", "value": "attendee_dev", "temporary": false }
+      ],
+      "realmRoles": []
+    }
+  ]
+}

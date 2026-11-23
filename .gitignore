@@ -1,0 +1,21 @@
+# Build
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Secrets and local environment (only .env.example is versioned)
+.env
+*.local.yml
+*.local.properties
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

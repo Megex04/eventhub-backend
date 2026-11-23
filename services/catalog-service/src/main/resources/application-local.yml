@@ -1,0 +1,6 @@
+# Local development profile. Datasource, broker and JWT settings are added by the milestones that need them.
+# Values here are development-only; real secrets come from environment variables.
+management:
+  endpoint:
+    health:
+      show-details: always
