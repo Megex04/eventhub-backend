@@ -21,13 +21,17 @@ comentarios de alto nivel; **ingles** para codigo, nombres, commits y logs.
   start.spring.io; si implica un salto de linea mayor, pregunta antes.
 - Jackson 3: paquetes `tools.jackson.*` (databind, `JsonMapper`); las anotaciones siguen en
   `com.fasterxml.jackson.annotation`. Toda libreria que toque JSON debe soportar Jackson 3
-  (Jackson 2 solo puede aparecer como dependencia transitiva de una libreria de test).
+  (Jackson 2 solo puede aparecer en el classpath de **test**). Excepcion vigente: swagger-request-validator
+  3.0.0 exige `networknt:json-schema-validator` 2.0.1 (Jackson 2), que no puede convivir con la 3.x
+  (`NoSuchMethodError`); por eso los tests de esquemas JSON usan la 2.x. Revisar cuando el validador
+  OpenAPI soporte Jackson 3.
 - Maven con **Maven Wrapper** (`./mvnw`). Monorepo multi-modulo, versiones centralizadas en el parent (`dependencyManagement`).
 - PostgreSQL + Flyway. RabbitMQ en local; **Azure Service Bus** en Azure (fase 2).
 - Mensajeria via **Spring Cloud Stream** (abstraccion de broker), usando el BOM de Spring Cloud compatible con la version de Boot.
 - Auth: Keycloak en Docker (local) -> Microsoft Entra ID (fase 3). Los servicios son **OAuth2 Resource Server** (JWT).
 - Tests: JUnit 5, AssertJ, Mockito, Testcontainers, ArchUnit, MockMvc/WebTestClient, networknt
-  json-schema-validator **3.x** (la linea que usa Jackson 3), swagger-request-validator
+  json-schema-validator **2.x** (ver nota de Jackson abajo), swagger-request-validator
+  (artefacto `openapi-request-validator-mockmvc`)
   (conformidad de respuestas con el OpenAPI).
 
 ### Convenciones de Spring Boot 4

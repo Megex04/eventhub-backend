@@ -26,8 +26,11 @@ importado por BOM en `dependencyManagement`. Todos los servicios heredan estas v
 ## Consecuencias
 
 - **Jackson 3** (`tools.jackson.*`) es el JSON por defecto. Las anotaciones siguen en
-  `com.fasterxml.jackson.annotation`. Las librerias de JSON deben soportarlo:
-  `networknt/json-schema-validator` **3.x** (su linea Jackson 3) en lugar de la 2.x.
+  `com.fasterxml.jackson.annotation`. En produccion todo JSON va por Jackson 3. En **tests**,
+  `swagger-request-validator` 3.0.0 (conformidad de respuestas con el OpenAPI) arrastra
+  `networknt/json-schema-validator` 2.0.1 y Jackson 2; la 3.x de networknt (Jackson 3) no puede convivir
+  con ella (`NoSuchMethodError`, comprobado). Se mantiene la 2.0.1 en tests, tambien para los contract
+  tests de esquemas de eventos.
 - **Generador OpenAPI >= 7.16** con `useSpringBoot4` y `useJackson3` (sustituyen a `useSpringBoot3`).
   Se desactivan las anotaciones swagger/springdoc para no sumar dependencias.
 - **Starters renombrados** (`spring-boot-starter-webmvc`, `...-webmvc-test`, `...-flyway`,
@@ -36,7 +39,9 @@ importado por BOM en `dependencyManagement`. Todos los servicios heredan estas v
 - `HttpStatus.UNPROCESSABLE_ENTITY` esta deprecada; se usa `UNPROCESSABLE_CONTENT` (sigue siendo 422).
 - Validacion de parametros de query en interfaces generadas con `@Validated`: el proxy lanza
   `ConstraintViolationException` (no `HandlerMethodValidationException`); el handler central lo cubre.
-- **Riesgo asumido:** el soporte de Jackson 3 / Spring Framework 7 en librerias de test de terceros
-  (p. ej. `swagger-request-validator`) debe comprobarse antes de adoptarlas; si una no lo soporta, se
-  usa su nucleo con un adaptador propio o se descarta, y se anota aqui.
+- **Verificado:** `swagger-request-validator` 3.0.0 funciona con Spring Framework 7 y MockMvc y detecta
+  respuestas no declaradas. **Deuda:** su dependencia de Jackson 2 en tests; revisar cuando soporte
+  Jackson 3 y entonces pasar los tests de esquemas a networknt 3.x.
+- Toda libreria de terceros nueva debe comprobarse contra Jackson 3 / Spring Framework 7 antes de
+  adoptarla; si no lo soporta, se usa su nucleo con un adaptador propio o se descarta, y se anota aqui.
 - Subir a una linea mayor posterior (Boot 5) vuelve a requerir confirmacion explicita, como dice CLAUDE.md.
