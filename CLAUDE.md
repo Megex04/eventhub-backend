@@ -123,6 +123,15 @@ infrastructure/
   (ej. `catalog.event.published.v1`). Una cola por consumidor+tema, con **DLQ** y reintentos con backoff.
 - **Transactional Outbox:** el aggregate y su fila en `outbox_event` se guardan en la misma transaccion;
   un publicador (poller con `FOR UPDATE SKIP LOCKED`) envia al broker y marca `published_at`. Entrega **at-least-once**.
+  - `messageId` = id de la fila outbox, estable entre reintentos. Se marca `published_at` **solo tras la
+    confirmacion del broker** (publisher confirm, envio sincronico con timeout).
+  - Orden **por agregado**: una fila solo se envia si no hay otra anterior sin publicar del mismo agregado.
+    Se procesa en `created_at, id` y el lote se corta en el primer fallo.
+  - Fallo -> `attempts`/`last_error`/`next_attempt_at` con backoff exponencial; al llegar al tope de intentos
+    la fila queda **aparcada** (sigue bloqueando a su agregado hasta que una persona la resuelva).
+  - Metricas: `outbox.pending`, `outbox.parked`, `outbox.oldest.age` (segundos).
+  - Un confirm del broker no implica cola destino: sin cola enlazada RabbitMQ confirma y descarta. Los
+    consumidores declaran sus colas; los eventos previos no se reenvian.
 - **Consumidores idempotentes:** tabla `processed_message(message_id PK)`; ignorar duplicados.
 - Cambios de esquema **compatibles hacia atras** dentro de una version; un cambio incompatible crea `v2` (nuevo archivo, nueva routing key).
 - Todo productor/consumidor tiene un **test de contrato** que valida payloads contra el JSON Schema.
@@ -141,7 +150,7 @@ infrastructure/
 
 - Logs estructurados (JSON) con `traceId` y `correlationId`. Sin datos personales en logs.
 - Actuator: `health` (liveness/readiness) e `info`; `prometheus`/OTLP via Micrometer. Endpoints sensibles protegidos.
-- Propagar `correlationId` del request HTTP al evento y de ahi a los consumidores.
+- Propagar `correlationId` del request HTTP al evento y de ahi a los consumidores: `X-Correlation-Id` (UUID valido o se genera) -> MDC -> `CorrelationIdProvider` -> envelope.
 
 ## Testing
 

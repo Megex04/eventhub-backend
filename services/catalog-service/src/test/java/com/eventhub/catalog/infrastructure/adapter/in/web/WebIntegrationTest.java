@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * arrange events by calling the API itself, so arranging never bypasses the rules under test.
  */
 @AutoConfigureMockMvc
-abstract class WebIntegrationTest extends PostgresIntegrationTest {
+public abstract class WebIntegrationTest extends PostgresIntegrationTest {
 
   protected static final String EVENTS = "/api/v1/events";
   protected static final String PROBLEM_JSON = "application/problem+json";

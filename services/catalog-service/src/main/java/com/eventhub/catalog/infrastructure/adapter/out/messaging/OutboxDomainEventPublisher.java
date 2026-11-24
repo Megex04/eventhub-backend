@@ -27,10 +27,10 @@ public class OutboxDomainEventPublisher implements DomainEventPublisher {
       """
       INSERT INTO outbox_event
         (id, aggregate_type, aggregate_id, event_type, event_version,
-         payload, correlation_id, created_at, attempts)
+         payload, correlation_id, created_at, next_attempt_at, attempts)
       VALUES
         (:id, :aggregateType, :aggregateId, :eventType, :eventVersion,
-         CAST(:payload AS jsonb), :correlationId, :createdAt, 0)
+         CAST(:payload AS jsonb), :correlationId, :createdAt, :createdAt, 0)
       """;
 
   private final JdbcClient jdbc;

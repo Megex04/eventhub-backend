@@ -5,6 +5,9 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB:catalog}
     username: ${POSTGRES_USER:eventhub}
     password: ${POSTGRES_PASSWORD}
+  rabbitmq:
+    username: ${RABBITMQ_DEFAULT_USER:eventhub}
+    password: ${RABBITMQ_DEFAULT_PASS}
   security:
     oauth2:
       resourceserver:

@@ -1,5 +1,6 @@
 package com.eventhub.catalog.support;
 
+import com.eventhub.catalog.infrastructure.adapter.out.messaging.OutboxBroker;
 import com.eventhub.catalog.infrastructure.adapter.out.persistence.JpaEventRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -8,6 +9,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -42,6 +44,14 @@ public class TestSupportConfig {
   @Primary
   HookableEventRepository hookableEventRepository(JpaEventRepository real) {
     return new HookableEventRepository(real);
+  }
+
+  /** Primary {@code OutboxBroker}: the real one, with a switch to make chosen sends fail. */
+  @Bean
+  @Primary
+  ControllableOutboxBroker controllableOutboxBroker(
+      @Qualifier("streamBridgeOutboxBroker") OutboxBroker real) {
+    return new ControllableOutboxBroker(real);
   }
 
   @Bean

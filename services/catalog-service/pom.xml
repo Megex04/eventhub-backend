@@ -47,6 +47,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
     </dependency>
+    <!-- Broker abstraction (CLAUDE.md): the outbox relay sends through StreamBridge; RabbitMQ locally. -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-stream-rabbit</artifactId>
+    </dependency>
     <!-- The generated request models carry Jakarta Validation constraints taken from the OpenAPI schema. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -83,6 +88,11 @@
     <dependency>
       <groupId>com.atlassian.oai</groupId>
       <artifactId>openapi-request-validator-mockmvc</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-rabbitmq</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- One PostgreSQL container per test JVM, wired through @DynamicPropertySource. -->
