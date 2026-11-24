@@ -23,6 +23,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
+    <!-- @Transactional on use cases. Declared on its own because JPA (which brings it) arrives in M4. -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

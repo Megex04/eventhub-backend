@@ -232,6 +232,15 @@ public final class Event {
     pendingEvents.add(new EventRescheduled(id, newStartsAt, newEndsAt, validVenue, now));
   }
 
+  /** Only drafts can be removed; the use case deletes the row after this guard passes. */
+  public void ensureDeletable() {
+    requireStatus(EventStatus.DRAFT, "delete");
+  }
+
+  public boolean isOrganizedBy(UUID userId) {
+    return organizerId.equals(userId);
+  }
+
   /** Returns the events recorded since the last call and forgets them. */
   public List<DomainEvent> pullDomainEvents() {
     List<DomainEvent> events = List.copyOf(pendingEvents);
