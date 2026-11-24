@@ -1,9 +1,9 @@
 package com.eventhub.catalog.infrastructure.adapter.out.messaging;
 
+import com.eventhub.catalog.application.port.out.CorrelationIdProvider;
 import com.eventhub.catalog.application.port.out.DomainEventPublisher;
 import com.eventhub.catalog.application.port.out.IdGenerator;
 import com.eventhub.catalog.domain.DomainEvent;
-import com.eventhub.catalog.infrastructure.config.CorrelationContext;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -37,20 +37,26 @@ public class OutboxDomainEventPublisher implements DomainEventPublisher {
   private final OutboxEnvelopeFactory envelopes;
   private final IdGenerator ids;
   private final Clock clock;
+  private final CorrelationIdProvider correlation;
 
   public OutboxDomainEventPublisher(
-      JdbcClient jdbc, JsonMapper json, IdGenerator ids, Clock clock) {
+      JdbcClient jdbc,
+      JsonMapper json,
+      IdGenerator ids,
+      Clock clock,
+      CorrelationIdProvider correlation) {
     this.jdbc = jdbc;
     this.envelopes = new OutboxEnvelopeFactory(json);
     this.ids = ids;
     this.clock = clock;
+    this.correlation = correlation;
   }
 
   /** MANDATORY: an event written outside the aggregate's transaction could be lost or orphaned. */
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void publish(List<DomainEvent> events) {
-    UUID correlationId = CorrelationContext.current().orElseGet(ids::newId);
+    UUID correlationId = correlation.current().orElseGet(ids::newId);
     for (DomainEvent event : events) {
       insert(envelopes.create(event, ids.newId(), correlationId, clock.instant()));
     }

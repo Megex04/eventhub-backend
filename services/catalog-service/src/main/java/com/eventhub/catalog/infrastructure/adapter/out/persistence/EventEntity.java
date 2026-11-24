@@ -15,8 +15,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.annotations.OptimisticLock;
 
-/** Persistence shape of the Event aggregate; the domain model never sees this class. */
+/**
+ * Persistence shape of the Event aggregate; the domain model never sees this class.
+ *
+ * <p>The version is advanced exactly once per save by {@link JpaEventRepository}, which claims the
+ * row before it writes anything (see {@code claimRow}). The mutable columns are therefore excluded
+ * from Hibernate's own dirty-driven increment: otherwise a save would bump the version twice.
+ */
 @Entity
 @Table(name = "event")
 class EventEntity {
@@ -26,31 +33,39 @@ class EventEntity {
   @Column(name = "organizer_id", nullable = false)
   private UUID organizerId;
 
+  @OptimisticLock(excluded = true)
   @Column(nullable = false, length = 120)
   private String title;
 
+  @OptimisticLock(excluded = true)
   @Column(nullable = false, length = 4000)
   private String description;
 
+  @OptimisticLock(excluded = true)
   @Column(nullable = false, length = 160)
   private String venue;
 
+  @OptimisticLock(excluded = true)
   @Column(name = "starts_at", nullable = false)
   private Instant startsAt;
 
+  @OptimisticLock(excluded = true)
   @Column(name = "ends_at", nullable = false)
   private Instant endsAt;
 
+  @OptimisticLock(excluded = true)
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
   private EventStatus status;
 
+  @OptimisticLock(excluded = true)
   @Column(name = "cancel_reason", length = 500)
   private String cancelReason;
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @OptimisticLock(excluded = true)
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 

@@ -9,7 +9,7 @@ import com.eventhub.catalog.domain.DomainEvent;
 import com.eventhub.catalog.domain.Event;
 import com.eventhub.catalog.domain.Money;
 import com.eventhub.catalog.domain.TicketZone;
-import com.eventhub.catalog.infrastructure.config.CorrelationContext;
+import com.eventhub.catalog.infrastructure.config.MdcCorrelationIdProvider;
 import com.eventhub.catalog.support.PostgresIntegrationTest;
 import java.time.Clock;
 import java.time.Duration;
@@ -41,7 +41,7 @@ class OutboxPublisherIT extends PostgresIntegrationTest {
 
   @AfterEach
   void clearCorrelation() {
-    MDC.remove(CorrelationContext.MDC_KEY);
+    MDC.remove(MdcCorrelationIdProvider.MDC_KEY);
   }
 
   private TransactionTemplate transaction() {
@@ -127,7 +127,7 @@ class OutboxPublisherIT extends PostgresIntegrationTest {
   @Test
   void should_use_the_request_correlation_id_when_one_is_in_the_logging_context() {
     UUID correlationId = UUID.randomUUID();
-    MDC.put(CorrelationContext.MDC_KEY, correlationId.toString());
+    MDC.put(MdcCorrelationIdProvider.MDC_KEY, correlationId.toString());
 
     publishInTransaction(publishedEvent().pullDomainEvents());
 
@@ -143,7 +143,7 @@ class OutboxPublisherIT extends PostgresIntegrationTest {
 
   @Test
   void should_generate_a_correlation_id_when_the_logging_context_value_is_not_a_uuid() {
-    MDC.put(CorrelationContext.MDC_KEY, "not-a-uuid");
+    MDC.put(MdcCorrelationIdProvider.MDC_KEY, "not-a-uuid");
 
     publishInTransaction(publishedEvent().pullDomainEvents());
 

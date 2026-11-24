@@ -10,7 +10,8 @@ import org.springframework.test.context.ContextConfiguration;
 /**
  * Base of the integration tests that need a database. Flyway migrates the shared container's schema
  * when the first context starts and Hibernate runs with {@code ddl-auto=validate}, exactly as in
- * production. Tables are emptied and the clock rewound before every test.
+ * production. Tables are emptied, the clock rewound and the repository hook cleared before every
+ * test.
  */
 @SpringBootTest
 @ContextConfiguration(initializers = SharedPostgres.class)
@@ -19,10 +20,12 @@ public abstract class PostgresIntegrationTest {
 
   @Autowired protected JdbcTemplate jdbc;
   @Autowired protected TestSupportConfig.AdjustableClock clock;
+  @Autowired protected HookableEventRepository repositoryHook;
 
   @BeforeEach
   void cleanDatabase() {
     clock.reset();
+    repositoryHook.reset();
     jdbc.execute("TRUNCATE TABLE outbox_event, ticket_zone, event CASCADE");
   }
 }

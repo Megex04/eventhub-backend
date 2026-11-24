@@ -1,5 +1,6 @@
 package com.eventhub.catalog.support;
 
+import com.eventhub.catalog.infrastructure.adapter.out.persistence.JpaEventRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +32,16 @@ public class TestSupportConfig {
   @Bean
   JwtDecoder jwtDecoder() {
     return NimbusJwtDecoder.withSecretKey(TOKEN_KEY).macAlgorithm(MacAlgorithm.HS256).build();
+  }
+
+  /**
+   * Primary {@code EventRepository}: the real adapter plus a hook between load and save, so tests
+   * can make a concurrent transaction land at the exact moment that matters.
+   */
+  @Bean
+  @Primary
+  HookableEventRepository hookableEventRepository(JpaEventRepository real) {
+    return new HookableEventRepository(real);
   }
 
   @Bean
