@@ -12,6 +12,13 @@ info:
     - Una vez `PUBLISHED`, las zonas son inmutables; solo se puede `reschedule` o `cancel`.
     - `CANCELLED` es un estado terminal.
     - Fechas en ISO-8601 UTC. Importes como string decimal con 2 decimales (nunca float).
+
+    Trazabilidad (aplica a todas las operaciones):
+    - Toda peticion acepta la cabecera opcional `X-Correlation-Id` (UUID). Si falta o no es un UUID valido,
+      el servicio genera uno.
+    - El valor se devuelve siempre en la cabecera `X-Correlation-Id` de la respuesta, aparece en los logs y
+      viaja en el campo `correlationId` del envelope de los eventos que la peticion provoque.
+    - Los errores incluyen `traceId` (trazado distribuido) para localizar la peticion en los logs.
 servers:
   - url: http://localhost:8081
     description: Local
