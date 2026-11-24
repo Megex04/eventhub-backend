@@ -361,7 +361,7 @@ public abstract class EventRepositoryContract {
   }
 
   @Test
-  void should_page_through_events_of_several_organizers_without_gaps_or_duplicates() {
+  void should_page_without_gaps_or_duplicates_when_events_of_several_organizers_are_listed() {
     Catalog catalog = seedCatalog();
     int total = catalog.published().size();
     List<UUID> collected = new ArrayList<>();
@@ -385,7 +385,7 @@ public abstract class EventRepositoryContract {
   }
 
   @Test
-  void should_page_an_organizers_view_that_mixes_own_and_foreign_events() {
+  void should_page_the_visible_events_when_an_organizer_view_mixes_own_and_foreign_events() {
     Catalog catalog = seedCatalog();
     int expected = catalog.published().size() + catalog.unpublishedOf(ORGANIZER_A).size();
     List<UUID> collected = new ArrayList<>();
@@ -458,7 +458,7 @@ public abstract class EventRepositoryContract {
   }
 
   @Test
-  void should_match_text_in_title_or_venue_ignoring_case() {
+  void should_match_title_or_venue_ignoring_case_when_text_is_given() {
     Event byTitle = saved(published(ORGANIZER_A, "Rock Fest", "Hall", days(10)));
     Event byVenue = saved(published(ORGANIZER_A, "Gala", "Teatro Colon", days(11)));
     saved(published(ORGANIZER_A, "Opera", "Hall", days(12)));
@@ -468,7 +468,8 @@ public abstract class EventRepositoryContract {
   }
 
   @Test
-  void should_treat_percent_underscore_and_backslash_as_literal_characters_in_text() {
+  void
+      should_treat_wildcards_as_literal_characters_when_text_has_percent_underscore_or_backslash() {
     Event percent = saved(published(ORGANIZER_A, "Sale 50% off", "Hall", days(10)));
     saved(published(ORGANIZER_A, "Sale 500 off", "Hall", days(11)));
     Event underscore = saved(published(ORGANIZER_A, "Jazz_Night", "Hall", days(12)));

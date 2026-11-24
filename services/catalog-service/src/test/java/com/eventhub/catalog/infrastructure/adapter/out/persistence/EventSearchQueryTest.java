@@ -35,7 +35,7 @@ class EventSearchQueryTest {
   }
 
   @Test
-  void should_order_by_the_expected_column_and_direction_for_each_sort() {
+  void should_order_by_the_expected_column_when_a_sort_is_requested() {
     assertThat(EventSearchQuery.orderBy(EventSort.STARTS_AT_ASC)).startsWith("e.startsAt asc");
     assertThat(EventSearchQuery.orderBy(EventSort.STARTS_AT_DESC)).startsWith("e.startsAt desc");
     assertThat(EventSearchQuery.orderBy(EventSort.TITLE_ASC)).startsWith("lower(e.title) asc");

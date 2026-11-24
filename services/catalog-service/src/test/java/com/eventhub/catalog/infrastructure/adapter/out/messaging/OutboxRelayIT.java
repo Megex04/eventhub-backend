@@ -120,7 +120,8 @@ class OutboxRelayIT extends MessagingIntegrationTest {
   // ---- ordering ----
 
   @Test
-  void should_send_one_event_per_aggregate_per_pass_and_in_order() throws Exception {
+  void should_send_one_event_per_aggregate_per_pass_and_in_order_when_several_are_pending()
+      throws Exception {
     UUID eventId = createPublished(organizer());
     rescheduleViaApi(eventId);
 
@@ -135,7 +136,8 @@ class OutboxRelayIT extends MessagingIntegrationTest {
   }
 
   @Test
-  void should_not_let_a_reschedule_overtake_a_publish_that_is_backing_off() throws Exception {
+  void should_not_let_a_reschedule_overtake_a_publish_when_the_publish_is_backing_off()
+      throws Exception {
     UUID eventId = createPublished(organizer());
     rescheduleViaApi(eventId);
     UUID publishRow =
@@ -165,7 +167,7 @@ class OutboxRelayIT extends MessagingIntegrationTest {
   }
 
   @Test
-  void should_cut_the_batch_at_the_first_failure_and_keep_creation_order() throws Exception {
+  void should_cut_the_batch_and_keep_creation_order_when_a_row_fails() throws Exception {
     UUID first = createPublished(organizer());
     UUID second = createPublished(organizer());
     UUID third = createPublished(organizer());
@@ -228,7 +230,7 @@ class OutboxRelayIT extends MessagingIntegrationTest {
   // ---- metrics ----
 
   @Test
-  void should_report_the_backlog_and_its_age_until_the_relay_catches_up() throws Exception {
+  void should_report_the_backlog_and_its_age_when_rows_are_pending() throws Exception {
     createPublished(organizer());
     createPublished(organizer());
     clock.advance(Duration.ofSeconds(30));
@@ -253,5 +255,31 @@ class OutboxRelayIT extends MessagingIntegrationTest {
     relay.publishPending();
 
     assertThat(count("outbox.failures") - failuresBefore).isEqualTo(1);
+  }
+
+  @Test
+  void should_keep_publishing_other_aggregates_when_one_is_backing_off_or_parked()
+      throws Exception {
+    UUID stuck = createPublished(organizer());
+    UUID healthy = createPublished(organizer());
+    UUID stuckRow = onlyOutboxRowOf(stuck);
+    broker.failWhen(message -> message.id().equals(stuckRow));
+
+    assertThat(relay.publishPending()).as("the failing row cuts only this pass").isZero();
+    assertThat(relay.publishPending())
+        .as("next pass: the failing row is backing off, the other aggregate goes through")
+        .isEqualTo(1);
+    assertThat(field(receive(), "$.data.eventId")).isEqualTo(healthy.toString());
+
+    UUID laterHealthy = createPublished(organizer());
+    for (int attempt = 0; attempt < 4; attempt++) {
+      clock.advance(Duration.ofMinutes(1));
+      relay.publishPending();
+    }
+    assertThat(row(stuckRow).get("attempts")).as("parked").isEqualTo(5);
+
+    assertThat(drain()).as("a parked row no longer stops anyone").isEqualTo(1);
+    assertThat(field(receive(), "$.data.eventId")).isEqualTo(laterHealthy.toString());
+    assertThat(gauge("outbox.parked")).isEqualTo(1);
   }
 }

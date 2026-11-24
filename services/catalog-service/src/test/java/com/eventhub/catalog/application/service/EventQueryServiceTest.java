@@ -114,7 +114,7 @@ class EventQueryServiceTest {
     }
 
     @Test
-    void should_pass_viewer_filters_sort_and_page_to_the_repository() {
+    void should_pass_viewer_filters_sort_and_page_to_the_repository_when_listing() {
       Instant from = STARTS_AT;
       Instant to = STARTS_AT.plusSeconds(3600);
       EventSearchCriteria criteria =

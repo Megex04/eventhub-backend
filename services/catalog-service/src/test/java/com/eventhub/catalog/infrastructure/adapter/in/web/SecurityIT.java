@@ -118,7 +118,7 @@ class SecurityIT extends WebIntegrationTest {
   }
 
   @Test
-  void should_serve_health_and_info_without_a_token() throws Exception {
+  void should_serve_health_and_info_when_there_is_no_token() throws Exception {
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
     mockMvc.perform(get("/actuator/info")).andExpect(status().isOk());
   }

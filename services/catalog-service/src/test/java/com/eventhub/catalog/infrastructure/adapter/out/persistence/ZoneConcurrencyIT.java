@@ -26,6 +26,10 @@ class ZoneConcurrencyIT extends ConcurrencyIT {
         eventId, ORGANIZER, new ZoneSpec(name, Money.of("80.00", "PEN"), 50));
   }
 
+  private long versionOf(UUID eventId) {
+    return jdbc.queryForObject("SELECT version FROM event WHERE id = ?", Long.class, eventId);
+  }
+
   private int zoneCount(UUID eventId) {
     return jdbc.queryForObject(
         "SELECT count(*) FROM ticket_zone WHERE event_id = ?", Integer.class, eventId);
@@ -47,6 +51,7 @@ class ZoneConcurrencyIT extends ConcurrencyIT {
     assertThat(outcome.count(Result.SUCCESS)).as(outcome.toString()).isEqualTo(1);
     assertThat(outcome.count(Result.CONFLICT)).as(outcome.toString()).isEqualTo(1);
     assertThat(zoneCount(eventId)).isEqualTo(2);
+    assertThat(versionOf(eventId)).as("one winner, one increment").isEqualTo(1);
   }
 
   @Test
@@ -93,6 +98,7 @@ class ZoneConcurrencyIT extends ConcurrencyIT {
     assertThat(outcome.count(Result.SUCCESS)).as(outcome.toString()).isEqualTo(1);
     assertThat(outcome.count(Result.CONFLICT)).as(outcome.toString()).isEqualTo(1);
     assertThat(zoneCount(eventId)).isEqualTo(2);
+    assertThat(versionOf(eventId)).as("one winner, one increment").isEqualTo(1);
   }
 
   @Test
@@ -113,6 +119,7 @@ class ZoneConcurrencyIT extends ConcurrencyIT {
     String status =
         jdbc.queryForObject("SELECT status FROM event WHERE id = ?", String.class, eventId);
     List<String> published = jdbc.queryForList("SELECT event_type FROM outbox_event", String.class);
+    assertThat(versionOf(eventId)).as("one winner, one increment").isEqualTo(1);
     if (status.equals("PUBLISHED")) {
       assertThat(zoneCount(eventId)).isEqualTo(1);
       assertThat(published).containsExactly("EventPublished");

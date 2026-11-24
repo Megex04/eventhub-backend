@@ -95,7 +95,7 @@ class EventZonesTest {
   }
 
   @Test
-  void should_not_expose_a_mutable_zone_list() {
+  void should_not_expose_a_mutable_zone_list_when_zones_are_read() {
     Event event = draftEventWithZone();
 
     assertThatThrownBy(() -> event.zones().add(zone("Hack")))
@@ -197,7 +197,7 @@ class EventZonesTest {
   }
 
   @Test
-  void should_keep_zones_immutable_after_publish() {
+  void should_keep_zones_immutable_when_the_event_is_published() {
     Event event = publishedEvent();
 
     assertThatThrownBy(() -> event.addZone(zone("Late"), CLOCK))

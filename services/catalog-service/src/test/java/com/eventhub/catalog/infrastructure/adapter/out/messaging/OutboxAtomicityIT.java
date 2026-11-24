@@ -91,7 +91,7 @@ class OutboxAtomicityIT extends MessagingIntegrationTest {
   }
 
   @Test
-  void should_publish_normally_once_the_failure_is_gone() throws Exception {
+  void should_publish_normally_when_the_failure_is_gone() throws Exception {
     UUID eventId = createDraftWithZone(organizer());
     failEveryOutboxInsertImmediately();
     publishExpectingFailure(eventId);

@@ -67,10 +67,26 @@ server:
   port: 8081
 
 management:
+  tracing:
+    # traceId/spanId reach the logging context and the problem+json bodies. Nothing is exported
+    # unless an operator turns an exporter on and gives it an endpoint.
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:

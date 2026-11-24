@@ -94,7 +94,8 @@ class OutboxPublisherIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_store_the_full_envelope_as_jsonb_with_the_row_id_as_message_id() {
+  void
+      should_store_the_full_envelope_as_jsonb_with_the_row_id_as_message_id_when_an_event_is_recorded() {
     Event event = publishedEvent();
 
     publishInTransaction(event.pullDomainEvents());

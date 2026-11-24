@@ -127,7 +127,7 @@ class OutboxEnvelopeFactoryTest {
   }
 
   @Test
-  void should_convert_event_cancelled_with_reason_and_cancellation_time() {
+  void should_convert_the_reason_and_cancellation_time_when_the_event_is_cancelled() {
     Event event = draftWithZone();
     event.publish(CLOCK);
     event.cancel("Venue unavailable", CLOCK);
@@ -144,7 +144,7 @@ class OutboxEnvelopeFactoryTest {
   }
 
   @Test
-  void should_convert_event_rescheduled_with_the_resulting_venue() {
+  void should_convert_the_resulting_venue_when_the_event_is_rescheduled() {
     Event event = draftWithZone();
     event.publish(CLOCK);
     event.reschedule(STARTS_AT.plus(Duration.ofDays(7)), STARTS_AT.plus(Duration.ofDays(8)), CLOCK);

@@ -59,7 +59,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_accept_a_well_formed_event_with_a_zone() {
+  void should_accept_the_rows_when_an_event_with_a_zone_is_well_formed() {
     UUID eventId = insertValidEvent();
 
     insertZone(eventId, "VIP", "250.50", "PEN", 100);
@@ -98,7 +98,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
 
   @ParameterizedTest
   @MethodSource("invalidEvents")
-  void should_reject_an_event_row_that_breaks_a_check_constraint(Row row) {
+  void should_reject_the_event_row_when_it_breaks_a_check_constraint(Row row) {
     assertThatThrownBy(() ->
             insertEvent(
                 row.status(), row.cancelReason(), row.startsAt(), row.endsAt(), row.title()))
@@ -107,7 +107,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
 
   @ParameterizedTest
   @MethodSource("invalidZones")
-  void should_reject_a_zone_row_that_breaks_a_check_constraint(
+  void should_reject_the_zone_row_when_it_breaks_a_check_constraint(
       String amount, String currency, int capacity) {
     UUID eventId = insertValidEvent();
 
@@ -125,7 +125,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_reject_a_zone_name_that_repeats_in_the_event_ignoring_case() {
+  void should_reject_the_zone_when_its_name_repeats_in_the_event_ignoring_case() {
     UUID eventId = insertValidEvent();
     insertZone(eventId, "VIP", "10.00", "PEN", 10);
 
@@ -134,7 +134,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_accept_the_same_zone_name_in_different_events() {
+  void should_accept_the_zone_when_the_same_name_is_used_in_different_events() {
     insertZone(insertValidEvent(), "VIP", "10.00", "PEN", 10);
 
     insertZone(insertValidEvent(), "VIP", "10.00", "PEN", 10);
@@ -197,7 +197,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_index_only_unpublished_outbox_rows_for_the_poller() {
+  void should_index_only_unpublished_rows_when_the_poller_looks_up_the_outbox() {
     String definition =
         jdbc.queryForObject(
             "SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_outbox_event_pending'",
@@ -207,7 +207,7 @@ class SchemaConstraintsIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_index_only_published_events_for_the_public_listing() {
+  void should_index_only_published_events_when_the_public_listing_is_queried() {
     String definition =
         jdbc.queryForObject(
             "SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_event_published_starts_at'",

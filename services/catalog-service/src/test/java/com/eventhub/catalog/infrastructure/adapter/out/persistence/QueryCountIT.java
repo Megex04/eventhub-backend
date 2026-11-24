@@ -73,7 +73,7 @@ class QueryCountIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_load_an_event_with_all_its_zones_in_a_single_statement() {
+  void should_load_all_zones_in_a_single_statement_when_an_event_is_read() {
     UUID id = saveEvents(3).getFirst();
     statistics.clear();
 
@@ -84,7 +84,7 @@ class QueryCountIT extends PostgresIntegrationTest {
   }
 
   @Test
-  void should_list_a_page_of_events_with_one_select_and_one_count_whatever_the_page_size() {
+  void should_use_one_select_and_one_count_when_a_page_of_events_is_listed() {
     saveEvents(25);
     statistics.clear();
 
