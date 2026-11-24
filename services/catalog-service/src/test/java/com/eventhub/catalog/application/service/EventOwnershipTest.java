@@ -89,7 +89,7 @@ class EventOwnershipTest {
 
     assertThatThrownBy(() -> operation.run(fixture, draft.id(), STRANGER))
         .isInstanceOf(EventNotFoundException.class);
-    assertThat(draft.status()).isEqualTo(EventStatus.DRAFT);
+    assertThat(fixture.reload(draft).status()).isEqualTo(EventStatus.DRAFT);
     assertThat(fixture.publisher.published()).isEmpty();
   }
 
@@ -114,7 +114,7 @@ class EventOwnershipTest {
         .isInstanceOfSatisfying(
             EventAccessDeniedException.class,
             e -> assertThat(e.eventId()).isEqualTo(published.id()));
-    assertThat(published.status()).isEqualTo(EventStatus.PUBLISHED);
+    assertThat(fixture.reload(published).status()).isEqualTo(EventStatus.PUBLISHED);
     assertThat(fixture.publisher.published()).isEmpty();
   }
 }

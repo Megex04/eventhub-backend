@@ -65,7 +65,11 @@ class EventCommandServiceTest {
     void should_persist_the_event_when_creation_succeeds() {
       Event event = fixture.commands.create(createCommand(List.of(zoneSpec("General"))));
 
-      assertThat(fixture.repository.findById(event.id())).containsSame(event);
+      assertThat(fixture.repository.findById(event.id()))
+          .hasValueSatisfying(persisted -> {
+            assertThat(persisted.title()).isEqualTo("Rock Fest");
+            assertThat(persisted.zones()).hasSize(1);
+          });
     }
 
     @Test
@@ -116,7 +120,11 @@ class EventCommandServiceTest {
       assertThat(updated.title()).isEqualTo("New title");
       assertThat(updated.venue()).isEqualTo("New venue");
       assertThat(updated.updatedAt()).isEqualTo(NOW.plus(Duration.ofMinutes(5)));
-      assertThat(fixture.repository.findById(stored.id())).containsSame(updated);
+      assertThat(fixture.repository.findById(stored.id()))
+          .hasValueSatisfying(persisted -> {
+            assertThat(persisted.title()).isEqualTo("New title");
+            assertThat(persisted.venue()).isEqualTo("New venue");
+          });
     }
 
     @Test
@@ -125,7 +133,7 @@ class EventCommandServiceTest {
 
       assertThatThrownBy(() -> fixture.commands.update(updateCommand(stored, "New title")))
           .isInstanceOf(InvalidStateException.class);
-      assertThat(stored.title()).isEqualTo("Rock Fest");
+      assertThat(fixture.reload(stored).title()).isEqualTo("Rock Fest");
     }
 
     @Test
@@ -200,7 +208,7 @@ class EventCommandServiceTest {
               BusinessRuleViolationException.class,
               e -> assertThat(e.rule()).isEqualTo(Rule.STARTS_AT_NOT_IN_FUTURE));
       assertThat(fixture.publisher.published()).isEmpty();
-      assertThat(stored.status()).isEqualTo(EventStatus.DRAFT);
+      assertThat(fixture.reload(stored).status()).isEqualTo(EventStatus.DRAFT);
     }
 
     @Test

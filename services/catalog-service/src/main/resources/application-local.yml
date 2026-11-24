@@ -1,5 +1,11 @@
-# Local development profile. Datasource, broker and JWT settings are added by the milestones that need them.
-# Values here are development-only; real secrets come from environment variables.
+# Local development profile: points at the docker-compose services.
+# Export POSTGRES_PASSWORD (see .env.example) before running; it deliberately has no default here.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB:catalog}
+    username: ${POSTGRES_USER:eventhub}
+    password: ${POSTGRES_PASSWORD}
+
 management:
   endpoint:
     health:

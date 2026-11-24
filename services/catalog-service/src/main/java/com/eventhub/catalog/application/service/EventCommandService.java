@@ -80,7 +80,7 @@ public class EventCommandService
   public void delete(UUID eventId, UUID requesterId) {
     Event event = lookup.ownedBy(eventId, requesterId);
     event.ensureDeletable();
-    repository.delete(eventId);
+    repository.delete(event);
   }
 
   @Override

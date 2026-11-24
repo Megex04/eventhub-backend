@@ -37,7 +37,7 @@ class ZoneServiceTest {
     assertThat(fixture.repository.findById(stored.id()).orElseThrow().zones())
         .extracting(TicketZone::name)
         .containsExactly("General", "VIP");
-    assertThat(stored.updatedAt()).isEqualTo(NOW.plus(Duration.ofMinutes(1)));
+    assertThat(fixture.reload(stored).updatedAt()).isEqualTo(NOW.plus(Duration.ofMinutes(1)));
   }
 
   @Test
@@ -68,7 +68,7 @@ class ZoneServiceTest {
     assertThatThrownBy(() ->
             fixture.zones.addZone(new AddZoneUseCase.Command(stored.id(), OWNER, zoneSpec("VIP"))))
         .isInstanceOf(InvalidStateException.class);
-    assertThat(stored.zones()).hasSize(1);
+    assertThat(fixture.reload(stored).zones()).hasSize(1);
   }
 
   @Test
@@ -114,6 +114,6 @@ class ZoneServiceTest {
 
     assertThatThrownBy(() -> fixture.zones.removeZone(stored.id(), UUID.randomUUID(), OWNER))
         .isInstanceOf(ZoneNotFoundException.class);
-    assertThat(stored.zones()).hasSize(1);
+    assertThat(fixture.reload(stored).zones()).hasSize(1);
   }
 }

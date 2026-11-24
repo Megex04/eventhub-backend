@@ -1,6 +1,7 @@
 package com.eventhub.catalog.application.service;
 
 import com.eventhub.catalog.application.port.in.ZoneSpec;
+import com.eventhub.catalog.application.port.out.InMemoryEventRepository;
 import com.eventhub.catalog.domain.Event;
 import com.eventhub.catalog.domain.Money;
 import com.eventhub.catalog.domain.TicketZone;
@@ -19,6 +20,7 @@ final class Fixture {
   static final UUID STRANGER = UUID.fromString("9a7d5e12-3c4b-4f60-8e21-b5d0c3a96f02");
 
   final InMemoryEventRepository repository = new InMemoryEventRepository();
+  // The fake hands out copies, so tests re-read through reload() to observe persisted state.
   final RecordingDomainEventPublisher publisher = new RecordingDomainEventPublisher();
   final SequentialIdGenerator ids = new SequentialIdGenerator();
   final MutableClock clock = new MutableClock(NOW);
@@ -48,7 +50,7 @@ final class Fixture {
             List.of(TicketZone.create(ids.newId(), "General", money("100.00"), 100)),
             clock);
     repository.save(event);
-    return event;
+    return reload(event);
   }
 
   Event givenPublished(UUID organizerId) {
@@ -56,7 +58,7 @@ final class Fixture {
     event.publish(clock);
     event.pullDomainEvents();
     repository.save(event);
-    return event;
+    return reload(event);
   }
 
   Event givenCancelled(UUID organizerId) {
@@ -64,6 +66,11 @@ final class Fixture {
     event.cancel("Venue unavailable", clock);
     event.pullDomainEvents();
     repository.save(event);
-    return event;
+    return reload(event);
+  }
+
+  /** The persisted state of the event, as the next transaction would see it. */
+  Event reload(Event event) {
+    return repository.findById(event.id()).orElseThrow();
   }
 }

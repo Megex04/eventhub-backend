@@ -36,6 +36,8 @@ public final class Event {
   private final List<TicketZone> zones;
   private final Instant createdAt;
   private Instant updatedAt;
+  // Optimistic-locking token owned by persistence: read-only here, never changed by the domain.
+  private final long version;
   private final List<DomainEvent> pendingEvents = new ArrayList<>();
 
   private Event(
@@ -50,7 +52,8 @@ public final class Event {
       String cancelReason,
       List<TicketZone> zones,
       Instant createdAt,
-      Instant updatedAt) {
+      Instant updatedAt,
+      long version) {
     this.id = id;
     this.organizerId = organizerId;
     this.title = title;
@@ -63,6 +66,7 @@ public final class Event {
     this.zones = new ArrayList<>(zones);
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
+    this.version = version;
   }
 
   /** Creates a DRAFT. A past {@code startsAt} is accepted here; it only blocks publication. */
@@ -96,7 +100,8 @@ public final class Event {
             null,
             List.of(),
             now,
-            now);
+            now,
+            0L);
     initialZones.forEach(event::registerZone);
     return event;
   }
@@ -114,7 +119,8 @@ public final class Event {
       Optional<String> cancelReason,
       List<TicketZone> zones,
       Instant createdAt,
-      Instant updatedAt) {
+      Instant updatedAt,
+      long version) {
     return new Event(
         Objects.requireNonNull(id),
         Objects.requireNonNull(organizerId),
@@ -127,7 +133,8 @@ public final class Event {
         cancelReason.orElse(null),
         zones,
         Objects.requireNonNull(createdAt),
-        Objects.requireNonNull(updatedAt));
+        Objects.requireNonNull(updatedAt),
+        version);
   }
 
   public void update(
@@ -294,6 +301,11 @@ public final class Event {
 
   public Instant updatedAt() {
     return updatedAt;
+  }
+
+  /** Version this instance was loaded with (0 for a new event); used to detect stale writes. */
+  public long version() {
+    return version;
   }
 
   private void registerZone(TicketZone zone) {

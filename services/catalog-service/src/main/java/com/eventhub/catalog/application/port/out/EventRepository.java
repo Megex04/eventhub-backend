@@ -1,5 +1,6 @@
 package com.eventhub.catalog.application.port.out;
 
+import com.eventhub.catalog.application.exception.EventVersionConflictException;
 import com.eventhub.catalog.application.query.EventSearchCriteria;
 import com.eventhub.catalog.application.query.EventSort;
 import com.eventhub.catalog.application.query.EventSummary;
@@ -9,14 +10,29 @@ import com.eventhub.catalog.domain.Event;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Persistence port. Writes use optimistic locking: an {@link Event} carries the version it was
+ * loaded with, and a write fails when the stored version moved on in the meantime.
+ */
 public interface EventRepository {
 
   Optional<Event> findById(UUID id);
 
-  /** Inserts or updates the aggregate, zones included. */
+  /**
+   * Inserts or updates the aggregate, zones included.
+   *
+   * @throws EventVersionConflictException if the stored event changed since this instance was
+   *     loaded
+   */
   void save(Event event);
 
-  void delete(UUID id);
+  /**
+   * Removes the event with its zones. Deleting an event that no longer exists is a no-op.
+   *
+   * @throws EventVersionConflictException if the stored event changed since this instance was
+   *     loaded
+   */
+  void delete(Event event);
 
   /** Applies the criteria's filters AND its viewer-based visibility; never loads zones. */
   PageResult<EventSummary> search(EventSearchCriteria criteria, EventSort sort, PageRequest page);

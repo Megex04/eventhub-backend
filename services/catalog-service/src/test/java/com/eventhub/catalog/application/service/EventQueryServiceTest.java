@@ -41,14 +41,14 @@ class EventQueryServiceTest {
     void should_return_published_event_when_viewer_is_anonymous() {
       Event stored = fixture.givenPublished(OWNER);
 
-      assertThat(fixture.queries.get(stored.id(), anonymous)).isSameAs(stored);
+      assertThat(fixture.queries.get(stored.id(), anonymous).id()).isEqualTo(stored.id());
     }
 
     @Test
     void should_return_published_event_when_viewer_is_another_user() {
       Event stored = fixture.givenPublished(OWNER);
 
-      assertThat(fixture.queries.get(stored.id(), stranger)).isSameAs(stored);
+      assertThat(fixture.queries.get(stored.id(), stranger).id()).isEqualTo(stored.id());
     }
 
     @Test
@@ -80,8 +80,8 @@ class EventQueryServiceTest {
       Event draft = fixture.givenDraft(OWNER);
       Event cancelled = fixture.givenCancelled(OWNER);
 
-      assertThat(fixture.queries.get(draft.id(), owner)).isSameAs(draft);
-      assertThat(fixture.queries.get(cancelled.id(), owner)).isSameAs(cancelled);
+      assertThat(fixture.queries.get(draft.id(), owner).id()).isEqualTo(draft.id());
+      assertThat(fixture.queries.get(cancelled.id(), owner).id()).isEqualTo(cancelled.id());
     }
 
     @Test
@@ -103,20 +103,13 @@ class EventQueryServiceTest {
 
     @Test
     void should_return_the_repository_page_when_listing() {
-      EventSummary summary =
-          new EventSummary(
-              UUID.randomUUID(),
-              "Rock Fest",
-              "Estadio",
-              STARTS_AT,
-              STARTS_AT,
-              EventStatus.PUBLISHED);
-      fixture.repository.willReturn(new PageResult<>(List.of(summary), 0, 20, 1));
+      Event published = fixture.givenPublished(OWNER);
+      fixture.givenDraft(OWNER);
 
       PageResult<EventSummary> result =
           fixture.queries.list(query(EventSearchCriteria.visibleTo(anonymous)));
 
-      assertThat(result.content()).containsExactly(summary);
+      assertThat(result.content()).extracting(EventSummary::id).containsExactly(published.id());
       assertThat(result.totalElements()).isEqualTo(1);
     }
 
@@ -135,14 +128,14 @@ class EventQueryServiceTest {
       fixture.queries.list(
           new ListEventsUseCase.Query(criteria, EventSort.TITLE_DESC, new PageRequest(2, 50)));
 
-      assertThat(fixture.repository.lastCriteria).isEqualTo(criteria);
-      assertThat(fixture.repository.lastCriteria.status()).contains(EventStatus.DRAFT);
-      assertThat(fixture.repository.lastCriteria.text()).contains("rock");
-      assertThat(fixture.repository.lastCriteria.from()).contains(from);
-      assertThat(fixture.repository.lastCriteria.to()).contains(to);
-      assertThat(fixture.repository.lastCriteria.onlyMine()).isTrue();
-      assertThat(fixture.repository.lastSort).isEqualTo(EventSort.TITLE_DESC);
-      assertThat(fixture.repository.lastPage).isEqualTo(new PageRequest(2, 50));
+      assertThat(fixture.repository.lastCriteria()).isEqualTo(criteria);
+      assertThat(fixture.repository.lastCriteria().status()).contains(EventStatus.DRAFT);
+      assertThat(fixture.repository.lastCriteria().text()).contains("rock");
+      assertThat(fixture.repository.lastCriteria().from()).contains(from);
+      assertThat(fixture.repository.lastCriteria().to()).contains(to);
+      assertThat(fixture.repository.lastCriteria().onlyMine()).isTrue();
+      assertThat(fixture.repository.lastSort()).isEqualTo(EventSort.TITLE_DESC);
+      assertThat(fixture.repository.lastPage()).isEqualTo(new PageRequest(2, 50));
     }
 
     @Test
@@ -151,22 +144,22 @@ class EventQueryServiceTest {
 
       assertThatThrownBy(() -> fixture.queries.list(query(criteria)))
           .isInstanceOf(AuthenticationRequiredException.class);
-      assertThat(fixture.repository.searchCount).isZero();
+      assertThat(fixture.repository.searchCount()).isZero();
     }
 
     @Test
     void should_allow_mine_when_viewer_is_authenticated() {
       fixture.queries.list(query(EventSearchCriteria.visibleTo(stranger).mineOnly()));
 
-      assertThat(fixture.repository.searchCount).isEqualTo(1);
+      assertThat(fixture.repository.searchCount()).isEqualTo(1);
     }
 
     @Test
     void should_not_restrict_to_one_organizer_when_mine_is_not_requested() {
       fixture.queries.list(query(EventSearchCriteria.visibleTo(owner)));
 
-      assertThat(fixture.repository.lastCriteria.onlyMine()).isFalse();
-      assertThat(fixture.repository.lastCriteria.status()).isEmpty();
+      assertThat(fixture.repository.lastCriteria().onlyMine()).isFalse();
+      assertThat(fixture.repository.lastCriteria().status()).isEmpty();
     }
 
     @Test

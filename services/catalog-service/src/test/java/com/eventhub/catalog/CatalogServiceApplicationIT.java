@@ -4,23 +4,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.eventhub.catalog.application.port.out.DomainEventPublisher;
-import com.eventhub.catalog.application.port.out.EventRepository;
+import com.eventhub.catalog.support.PostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
 @AutoConfigureMockMvc
-class CatalogServiceApplicationIT {
-
-  // Output-port adapters arrive in M4 (persistence) and M6 (outbox); until then the context needs
-  // stand-ins so the use-case beans can be wired. Remove each mock when its real adapter lands.
-  @MockitoBean private EventRepository eventRepository;
-  @MockitoBean private DomainEventPublisher domainEventPublisher;
+class CatalogServiceApplicationIT extends PostgresIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
 
@@ -38,5 +30,16 @@ class CatalogServiceApplicationIT {
         .perform(get("/actuator/health/readiness"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("UP"));
+  }
+
+  @Test
+  void should_apply_the_flyway_migration_when_the_context_starts(
+      @Autowired JdbcTemplate jdbcTemplate) {
+    Integer applied =
+        jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success",
+            Integer.class);
+
+    org.assertj.core.api.Assertions.assertThat(applied).isEqualTo(1);
   }
 }
