@@ -9,6 +9,15 @@ spring:
     url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+  jackson:
+    # Optional fields (description, cancelReason) are absent rather than null, as the contract says.
+    default-property-inclusion: non_null
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are discovered from the issuer (lazily, on the first token). No default on purpose.
+          issuer-uri: ${OIDC_ISSUER_URI}
   jpa:
     open-in-view: false
     hibernate:

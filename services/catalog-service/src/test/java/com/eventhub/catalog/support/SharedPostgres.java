@@ -26,7 +26,10 @@ public final class SharedPostgres
     TestPropertyValues.of(
             "spring.datasource.url=" + POSTGRES.getJdbcUrl(),
             "spring.datasource.username=" + POSTGRES.getUsername(),
-            "spring.datasource.password=" + POSTGRES.getPassword())
+            "spring.datasource.password=" + POSTGRES.getPassword(),
+            // Required by the resource server config; tests replace the decoder, so it is never
+            // called.
+            "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://keycloak.test/realms/eventhub")
         .applyTo(context);
   }
 }

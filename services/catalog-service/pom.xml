@@ -42,6 +42,16 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- The service is an OAuth2 Resource Server: it validates Keycloak/Entra JWTs, it never issues them. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+    </dependency>
+    <!-- The generated request models carry Jakarta Validation constraints taken from the OpenAPI schema. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -76,6 +86,58 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!--
+        Contract-first: the REST interfaces and DTOs are generated from the OpenAPI file that is the
+        source of truth. Output goes to target/generated-sources and is never versioned.
+      -->
+      <plugin>
+        <groupId>org.openapitools</groupId>
+        <artifactId>openapi-generator-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>catalog-api</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <inputSpec>${project.basedir}/../../contracts/openapi/catalog-api.yaml</inputSpec>
+              <generatorName>spring</generatorName>
+              <apiPackage>com.eventhub.catalog.infrastructure.adapter.in.web.api</apiPackage>
+              <modelPackage>com.eventhub.catalog.infrastructure.adapter.in.web.model</modelPackage>
+              <!-- Suffix keeps DTOs distinct from the domain's Money, TicketZone and EventStatus. -->
+              <modelNameSuffix>Dto</modelNameSuffix>
+              <generateApiTests>false</generateApiTests>
+              <generateModelTests>false</generateModelTests>
+              <generateSupportingFiles>false</generateSupportingFiles>
+              <typeMappings>
+                <typeMapping>DateTime=Instant</typeMapping>
+              </typeMappings>
+              <importMappings>
+                <importMapping>Instant=java.time.Instant</importMapping>
+              </importMappings>
+              <configOptions>
+                <interfaceOnly>true</interfaceOnly>
+                <delegatePattern>false</delegatePattern>
+                <skipDefaultInterface>true</skipDefaultInterface>
+                <useSpringBoot4>true</useSpringBoot4>
+                <useJackson3>true</useJackson3>
+                <useBeanValidation>true</useBeanValidation>
+                <useTags>true</useTags>
+                <openApiNullable>false</openApiNullable>
+                <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                <!-- Null handling is governed by spring.jackson.default-property-inclusion instead. -->
+                <generateJsonIncludeAnnotations>false</generateJsonIncludeAnnotations>
+                <generateJsonSetterNullsAnnotations>false</generateJsonSetterNullsAnnotations>
+                <!-- No swagger-annotations / springdoc: the OpenAPI file itself is the documentation. -->
+                <documentationProvider>none</documentationProvider>
+                <annotationLibrary>none</annotationLibrary>
+              </configOptions>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
