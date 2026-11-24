@@ -16,13 +16,28 @@ comentarios de alto nivel; **ingles** para codigo, nombres, commits y logs.
 ## Stack
 
 - Java **21** (records, sealed interfaces, pattern matching, virtual threads donde aplique).
-- Spring Boot: ultima version estable compatible con Java 21. **Verifica la version vigente** en
-  start.spring.io y fijala en el parent pom; si implica un salto de linea mayor, pregunta antes.
+- Spring Boot **4.2.x** (Spring Framework 7, Spring Security 7, **Jackson 3**), fijado en el parent pom
+  (decision en `docs/adr/0002-spring-boot-4.md`). Para subir de version, **verifica la vigente** en
+  start.spring.io; si implica un salto de linea mayor, pregunta antes.
+- Jackson 3: paquetes `tools.jackson.*` (databind, `JsonMapper`); las anotaciones siguen en
+  `com.fasterxml.jackson.annotation`. Toda libreria que toque JSON debe soportar Jackson 3
+  (Jackson 2 solo puede aparecer como dependencia transitiva de una libreria de test).
 - Maven con **Maven Wrapper** (`./mvnw`). Monorepo multi-modulo, versiones centralizadas en el parent (`dependencyManagement`).
 - PostgreSQL + Flyway. RabbitMQ en local; **Azure Service Bus** en Azure (fase 2).
 - Mensajeria via **Spring Cloud Stream** (abstraccion de broker), usando el BOM de Spring Cloud compatible con la version de Boot.
 - Auth: Keycloak en Docker (local) -> Microsoft Entra ID (fase 3). Los servicios son **OAuth2 Resource Server** (JWT).
-- Tests: JUnit 5, AssertJ, Mockito, Testcontainers, ArchUnit, MockMvc/WebTestClient, networknt json-schema-validator.
+- Tests: JUnit 5, AssertJ, Mockito, Testcontainers, ArchUnit, MockMvc/WebTestClient, networknt
+  json-schema-validator **3.x** (la linea que usa Jackson 3), swagger-request-validator
+  (conformidad de respuestas con el OpenAPI).
+
+### Convenciones de Spring Boot 4
+
+- Starters con nombres nuevos: `spring-boot-starter-webmvc`, `spring-boot-starter-webmvc-test`,
+  `spring-boot-starter-security-oauth2-resource-server`, `spring-boot-starter-flyway`...
+  Los tests de MockMvc se anotan con `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc`.
+- 422 es `HttpStatus.UNPROCESSABLE_CONTENT` (`UNPROCESSABLE_ENTITY` esta deprecada).
+- Los modelos y la configuracion de Jackson salen de `spring.jackson.*` (p. ej.
+  `default-property-inclusion: non_null` para omitir campos opcionales).
 
 ## Estructura del monorepo
 
@@ -81,7 +96,11 @@ infrastructure/
 ## API REST
 
 - **Contract-first:** editar primero `contracts/openapi/catalog-api.yaml`; generar interfaces con `openapi-generator-maven-plugin`
-  (`interfaceOnly`, Spring Boot 3, Jakarta, sin delegate pattern). Los controllers implementan esas interfaces.
+  (version >= 7.16; `interfaceOnly`, `useSpringBoot4` + `useJackson3`, Jakarta, sin delegate pattern,
+  sin anotaciones swagger/springdoc, `date-time` -> `Instant`, modelos con sufijo `Dto`). Salida en
+  `target/generated-sources`, nunca versionada. Los controllers implementan esas interfaces.
+- El OpenAPI debe declarar **todos** los codigos que el servicio devuelve en la practica; un test de
+  conformidad (swagger-request-validator) lo comprueba contra las respuestas reales.
 - Prefijo `/api/v1`. Recursos en plural. Paginacion `page`/`size`.
 - Errores: **RFC 9457** `application/problem+json` con `ProblemDetail`; un `@RestControllerAdvice` central. Nunca exponer stack traces.
 - Mapeo: validacion de campos -> 400; transicion de estado invalida -> 409; regla de negocio incumplida -> 422; no encontrado o sin visibilidad -> 404; sin rol/duenio -> 403.
@@ -111,6 +130,8 @@ infrastructure/
 - `organizerId`/`userId` salen del claim `sub`, **nunca** del body.
 - Validar propiedad del recurso (un organizador solo modifica sus eventos).
 - Secretos por variables de entorno / Key Vault; nunca en `application.yml` versionado.
+- El emisor de tokens se configura con `OIDC_ISSUER_URI` (`spring.security.oauth2.resourceserver.jwt.issuer-uri`),
+  sin valor por defecto salvo en el perfil `local`.
 
 ## Observabilidad
 

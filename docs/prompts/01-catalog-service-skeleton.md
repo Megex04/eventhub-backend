@@ -115,6 +115,6 @@ dejan UN solo EventPublished en el outbox. Si falla, propon el fix minimo.
 ```
 
 ```text
-Genera el ADR 0002 explicando por que el inventario de booking-service se mantiene como
+Genera el ADR 0003 explicando por que el inventario de booking-service se mantiene como
 proyeccion local y no mediante llamadas sincronas a catalog-service.
 ```
