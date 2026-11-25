@@ -5,8 +5,10 @@ import com.eventhub.catalog.application.port.out.DomainEventPublisher;
 import com.eventhub.catalog.application.port.out.IdGenerator;
 import com.eventhub.catalog.domain.DomainEvent;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -57,9 +59,21 @@ public class OutboxDomainEventPublisher implements DomainEventPublisher {
   @Transactional(propagation = Propagation.MANDATORY)
   public void publish(List<DomainEvent> events) {
     UUID correlationId = correlation.current().orElseGet(ids::newId);
+    Instant previous = null;
     for (DomainEvent event : events) {
-      insert(envelopes.create(event, ids.newId(), correlationId, clock.instant()));
+      Instant createdAt = after(previous, clock.instant());
+      insert(envelopes.create(event, ids.newId(), correlationId, createdAt));
+      previous = createdAt;
     }
+  }
+
+  /**
+   * The relay orders rows by {@code created_at} and only then by a random id, so two events written
+   * by one call must never share an instant: a published event and the cancellation recorded right
+   * after it could otherwise swap. One microsecond is the precision the column stores.
+   */
+  private static Instant after(Instant previous, Instant now) {
+    return previous == null || now.isAfter(previous) ? now : previous.plus(1, ChronoUnit.MICROS);
   }
 
   private void insert(OutboxMessage message) {

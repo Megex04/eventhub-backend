@@ -182,5 +182,10 @@ abstract class ConcurrencyIT extends PostgresIntegrationTest {
         EventSearchCriteria criteria, EventSort sort, PageRequest page) {
       return delegate.search(criteria, sort, page);
     }
+
+    @Override
+    public java.util.List<Event> findReplayable(Optional<UUID> after, int limit) {
+      return delegate.findReplayable(after, limit);
+    }
   }
 }

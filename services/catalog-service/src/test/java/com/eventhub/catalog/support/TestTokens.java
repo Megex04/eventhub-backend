@@ -30,6 +30,11 @@ public final class TestTokens {
     return signed(ENCODER, subject, List.of(ORGANIZER_ROLE), Duration.ofMinutes(15));
   }
 
+  /** The ADMIN role only: it operates the platform but is not an organizer. */
+  public static String admin(String subject) {
+    return signed(ENCODER, subject, List.of("ADMIN"), Duration.ofMinutes(15));
+  }
+
   /** Authenticated but without the ORGANIZER role. */
   public static String attendee(String subject) {
     return signed(ENCODER, subject, List.of(), Duration.ofMinutes(15));

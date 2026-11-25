@@ -23,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -483,6 +484,75 @@ public abstract class EventRepositoryContract {
   }
 
   // --- helpers --------------------------------------------------------------------------------
+
+  // --- replayable events (ADR 0003) ------------------------------------------------------------
+
+  /** Small positive ids sort the same in Java (signed) and in PostgreSQL (unsigned bytes). */
+  private static UUID replayId(int n) {
+    return new UUID(1, 100 + n);
+  }
+
+  private Event cancelledWithId(UUID id) {
+    Event event =
+        reload(savedWithId(id, draft(ORGANIZER_A, "Cancelled", "Venue", days(10), "General")));
+    event.cancel("Venue unavailable", CLOCK);
+    repository().save(event);
+    return reload(event);
+  }
+
+  @Test
+  void should_list_only_published_and_cancelled_events_when_replayable_events_are_requested() {
+    saved(draft(ORGANIZER_A, "Draft", "Venue", days(10), "General"));
+    savedWithId(replayId(1), draft(ORGANIZER_A, "Published", "Venue", days(11), "General"));
+    cancelledWithId(replayId(2));
+
+    List<Event> replayable = repository().findReplayable(Optional.empty(), 10);
+
+    assertThat(replayable).extracting(Event::id).containsExactly(replayId(1), replayId(2));
+    assertThat(replayable)
+        .extracting(Event::status)
+        .containsExactly(EventStatus.PUBLISHED, EventStatus.CANCELLED);
+  }
+
+  @Test
+  void should_load_the_zones_and_the_version_when_replayable_events_are_requested() {
+    savedWithId(replayId(1), draft(ORGANIZER_A, "Two zones", "Venue", days(11), "General", "VIP"));
+
+    Event event = repository().findReplayable(Optional.empty(), 10).getFirst();
+
+    assertThat(event.zones()).extracting(TicketZone::name).containsExactly("General", "VIP");
+    assertThat(event.version()).isEqualTo(reload(event).version());
+  }
+
+  @Test
+  void should_order_by_id_and_honour_the_limit_when_replayable_events_are_requested() {
+    for (int n = 5; n >= 1; n--) {
+      savedWithId(replayId(n), draft(ORGANIZER_A, "Event " + n, "Venue", days(10 + n), "General"));
+    }
+
+    assertThat(repository().findReplayable(Optional.empty(), 3))
+        .extracting(Event::id)
+        .containsExactly(replayId(1), replayId(2), replayId(3));
+  }
+
+  @Test
+  void should_continue_after_the_cursor_when_after_is_given() {
+    for (int n = 1; n <= 5; n++) {
+      savedWithId(replayId(n), draft(ORGANIZER_A, "Event " + n, "Venue", days(10 + n), "General"));
+    }
+
+    assertThat(repository().findReplayable(Optional.of(replayId(3)), 10))
+        .extracting(Event::id)
+        .containsExactly(replayId(4), replayId(5));
+    assertThat(repository().findReplayable(Optional.of(replayId(5)), 10)).isEmpty();
+  }
+
+  @Test
+  void should_return_nothing_when_every_event_is_a_draft() {
+    saved(draft(ORGANIZER_A, "Draft", "Venue", days(10), "General"));
+
+    assertThat(repository().findReplayable(Optional.empty(), 10)).isEmpty();
+  }
 
   private PageResult<EventSummary> search(Viewer viewer, EventSort sort) {
     return repository().search(EventSearchCriteria.visibleTo(viewer), sort, FIRST_PAGE);

@@ -7,6 +7,7 @@ import com.eventhub.catalog.application.query.EventSummary;
 import com.eventhub.catalog.application.query.PageRequest;
 import com.eventhub.catalog.application.query.PageResult;
 import com.eventhub.catalog.domain.Event;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +34,12 @@ public interface EventRepository {
    *     loaded
    */
   void delete(Event event);
+
+  /**
+   * Published and cancelled events, with their zones, ordered by id and starting after {@code
+   * after} (exclusive). Drafts are never returned: they have not happened yet. Used by the replay.
+   */
+  List<Event> findReplayable(Optional<UUID> after, int limit);
 
   /** Applies the criteria's filters AND its viewer-based visibility; never loads zones. */
   PageResult<EventSummary> search(EventSearchCriteria criteria, EventSort sort, PageRequest page);

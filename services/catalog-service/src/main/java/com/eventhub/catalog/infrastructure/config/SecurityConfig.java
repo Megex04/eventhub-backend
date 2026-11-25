@@ -18,6 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 class SecurityConfig {
 
   static final String ORGANIZER_ROLE = "ORGANIZER";
+  static final String ADMIN_ROLE = "ADMIN";
 
   @Bean
   SecurityFilterChain apiSecurityFilterChain(HttpSecurity http, ProblemSecurityHandlers problems)
@@ -34,6 +35,8 @@ class SecurityConfig {
                 .permitAll()
                 .requestMatchers("/actuator/health/**", "/actuator/info")
                 .permitAll()
+                .requestMatchers("/actuator/replay")
+                .hasRole(ADMIN_ROLE)
                 .requestMatchers("/api/v1/**")
                 .hasRole(ORGANIZER_ROLE)
                 .anyRequest()

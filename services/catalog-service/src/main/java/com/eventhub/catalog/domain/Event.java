@@ -194,18 +194,42 @@ public final class Event {
     requireFuture(startsAt, now);
     this.status = EventStatus.PUBLISHED;
     this.updatedAt = now;
-    pendingEvents.add(
-        new EventPublished(
-            id,
-            organizerId,
-            title,
-            venue,
-            startsAt,
-            endsAt,
-            zones.stream()
-                .map(z -> new EventPublished.Zone(z.id(), z.name(), z.capacity(), z.price()))
-                .toList(),
-            now));
+    pendingEvents.add(publishedSnapshot(now));
+  }
+
+  /**
+   * Describes the event as it is now, for a consumer that missed what happened before: PUBLISHED ->
+   * {@code EventPublished}; CANCELLED -> {@code EventPublished} then {@code EventCancelled}. Both
+   * carry the instant of the last change ({@code updatedAt}), because the original publication
+   * instant is not stored. Nothing about the event changes. A DRAFT has not happened yet, so it is
+   * never replayed.
+   */
+  public List<DomainEvent> recordReplay() {
+    return switch (status) {
+      case PUBLISHED -> List.of(publishedSnapshot(updatedAt));
+      case CANCELLED ->
+          List.of(publishedSnapshot(updatedAt), new EventCancelled(id, cancelReason, updatedAt));
+      case DRAFT, FINISHED -> throw InvalidStateException.notAllowed("replay", status);
+    };
+  }
+
+  /** Only an event that has been published (and possibly cancelled) has a history to describe. */
+  public boolean isReplayable() {
+    return status == EventStatus.PUBLISHED || status == EventStatus.CANCELLED;
+  }
+
+  private EventPublished publishedSnapshot(Instant occurredAt) {
+    return new EventPublished(
+        id,
+        organizerId,
+        title,
+        venue,
+        startsAt,
+        endsAt,
+        zones.stream()
+            .map(z -> new EventPublished.Zone(z.id(), z.name(), z.capacity(), z.price()))
+            .toList(),
+        occurredAt);
   }
 
   /** PUBLISHED -> CANCELLED (terminal). Allowed even after the event has started. */

@@ -3,8 +3,10 @@ package com.eventhub.catalog.infrastructure.adapter.out.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.eventhub.catalog.application.port.out.CorrelationIdProvider;
 import com.eventhub.catalog.application.port.out.DomainEventPublisher;
 import com.eventhub.catalog.application.port.out.EventRepository;
+import com.eventhub.catalog.application.port.out.IdGenerator;
 import com.eventhub.catalog.domain.DomainEvent;
 import com.eventhub.catalog.domain.Event;
 import com.eventhub.catalog.domain.Money;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -38,6 +41,9 @@ class OutboxPublisherIT extends PostgresIntegrationTest {
   @Autowired private EventRepository repository;
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private JsonMapper json;
+  @Autowired private JdbcClient jdbcClient;
+  @Autowired private IdGenerator idGenerator;
+  @Autowired private CorrelationIdProvider correlationProvider;
 
   @AfterEach
   void clearCorrelation() {
@@ -123,6 +129,29 @@ class OutboxPublisherIT extends PostgresIntegrationTest {
     assertThat(rows())
         .extracting(row -> row.get("event_type"))
         .containsExactlyInAnyOrder("EventPublished", "EventCancelled");
+  }
+
+  @Test
+  void should_keep_created_at_strictly_increasing_when_the_clock_does_not_move_between_events() {
+    // Rows are ordered by created_at and then by a random id: equal instants could swap
+    // an EventPublished and the EventCancelled written right after it.
+    OutboxDomainEventPublisher onFrozenClock =
+        new OutboxDomainEventPublisher(jdbcClient, json, idGenerator, CLOCK, correlationProvider);
+    Event event = publishedEvent();
+    event.cancel("Venue unavailable", CLOCK);
+    List<DomainEvent> events = event.pullDomainEvents();
+
+    transaction().executeWithoutResult(status -> onFrozenClock.publish(events));
+
+    List<Map<String, Object>> stored = rows();
+    assertThat(stored)
+        .extracting(row -> row.get("event_type"))
+        .containsExactly("EventPublished", "EventCancelled");
+    List<Instant> createdAt =
+        stored.stream()
+            .map(row -> ((java.sql.Timestamp) row.get("created_at")).toInstant())
+            .toList();
+    assertThat(createdAt.get(1)).isAfter(createdAt.get(0));
   }
 
   @Test

@@ -28,6 +28,8 @@ final class Fixture {
   final EventCommandService commands = new EventCommandService(repository, publisher, ids, clock);
   final ZoneService zones = new ZoneService(repository, ids, clock);
   final EventQueryService queries = new EventQueryService(repository);
+  final EventReplayService replays =
+      new EventReplayService(repository, new EventReplayer(repository, publisher));
 
   static Money money(String amount) {
     return Money.of(amount, "PEN");

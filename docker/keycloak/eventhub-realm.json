@@ -9,6 +9,10 @@
       {
         "name": "ORGANIZER",
         "description": "Can create and manage events"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Operates the platform (e.g. re-emits events); not an organizer"
       }
     ]
   },
@@ -20,8 +24,12 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
-      "redirectUris": ["http://localhost:*"],
-      "webOrigins": ["+"],
+      "redirectUris": [
+        "http://localhost:*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
       "protocol": "openid-connect"
     }
   ],
@@ -35,9 +43,15 @@
       "lastName": "Organizer",
       "email": "organizer@eventhub.local",
       "credentials": [
-        { "type": "password", "value": "organizer_dev", "temporary": false }
+        {
+          "type": "password",
+          "value": "organizer_dev",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["ORGANIZER"]
+      "realmRoles": [
+        "ORGANIZER"
+      ]
     },
     {
       "id": "9a7d5e12-3c4b-4f60-8e21-b5d0c3a96f02",
@@ -48,9 +62,32 @@
       "lastName": "Attendee",
       "email": "attendee@eventhub.local",
       "credentials": [
-        { "type": "password", "value": "attendee_dev", "temporary": false }
+        {
+          "type": "password",
+          "value": "attendee_dev",
+          "temporary": false
+        }
       ],
       "realmRoles": []
+    },
+    {
+      "id": "c2d9f6a1-5b3e-4f7a-8d10-2e4b6a8c0d03",
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "email": "admin@eventhub.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin_dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMIN"
+      ]
     }
   ]
 }

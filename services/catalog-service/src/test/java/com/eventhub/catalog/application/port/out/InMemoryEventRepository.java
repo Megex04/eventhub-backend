@@ -72,6 +72,25 @@ public final class InMemoryEventRepository implements EventRepository {
     return new PageResult<>(content, page.page(), page.size(), matches.size());
   }
 
+  @Override
+  public List<Event> findReplayable(Optional<UUID> after, int limit) {
+    return store.values().stream()
+        .filter(Event::isReplayable)
+        .filter(event -> after.map(cursor -> compareIds(event.id(), cursor) > 0).orElse(true))
+        .sorted((a, b) -> compareIds(a.id(), b.id()))
+        .limit(limit)
+        .map(event -> copy(event, event.version()))
+        .toList();
+  }
+
+  /** Unsigned, like PostgreSQL compares uuid values, so the fake and the adapter agree. */
+  private static int compareIds(UUID a, UUID b) {
+    int byHigh = Long.compareUnsigned(a.getMostSignificantBits(), b.getMostSignificantBits());
+    return byHigh != 0
+        ? byHigh
+        : Long.compareUnsigned(a.getLeastSignificantBits(), b.getLeastSignificantBits());
+  }
+
   public boolean contains(UUID id) {
     return store.containsKey(id);
   }

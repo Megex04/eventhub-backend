@@ -8,11 +8,14 @@ import com.eventhub.catalog.application.query.EventSummary;
 import com.eventhub.catalog.application.query.PageRequest;
 import com.eventhub.catalog.application.query.PageResult;
 import com.eventhub.catalog.domain.Event;
+import com.eventhub.catalog.domain.EventStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
+import jakarta.persistence.TypedQuery;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -92,6 +95,40 @@ public class JpaEventRepository implements EventRepository {
     } catch (OptimisticLockException | ObjectOptimisticLockingFailureException e) {
       throw new EventVersionConflictException(event.id());
     }
+  }
+
+  /**
+   * Two queries whatever the page size: the ids of the page (a fetch join cannot be paged in the
+   * database), then the events of those ids with their zones.
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public List<Event> findReplayable(Optional<UUID> after, int limit) {
+    String cursor = after.isPresent() ? " and e.id > :after" : "";
+    TypedQuery<UUID> idQuery =
+        entityManager
+            .createQuery(
+                "select e.id from EventEntity e where e.status in :statuses"
+                    + cursor
+                    + " order by e.id",
+                UUID.class)
+            .setParameter("statuses", List.of(EventStatus.PUBLISHED, EventStatus.CANCELLED))
+            .setMaxResults(limit);
+    after.ifPresent(cursorId -> idQuery.setParameter("after", cursorId));
+    List<UUID> ids = idQuery.getResultList();
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    return entityManager
+        .createQuery(
+            "select distinct e from EventEntity e left join fetch e.zones"
+                + " where e.id in :ids order by e.id",
+            EventEntity.class)
+        .setParameter("ids", ids)
+        .getResultList()
+        .stream()
+        .map(EventEntityMapper::toDomain)
+        .toList();
   }
 
   @Override

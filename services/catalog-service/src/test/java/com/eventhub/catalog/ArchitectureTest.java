@@ -136,6 +136,20 @@ class ArchitectureTest {
               "org.springframework.jdbc..");
 
   @ArchTest
+  static final ArchRule admin_endpoints_only_talk_to_use_case_ports =
+      noClasses()
+          .that()
+          .resideInAPackage("..adapter.in.admin..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "..adapter.out..",
+              "..application.service..",
+              "jakarta.persistence..",
+              "org.springframework.data..",
+              "org.springframework.jdbc..");
+
+  @ArchTest
   static final ArchRule controllers_implement_a_generated_contract_interface =
       classes()
           .that()
