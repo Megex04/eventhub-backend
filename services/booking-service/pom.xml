@@ -128,6 +128,20 @@
         prepare-agent covers unit tests (surefire) and integration tests (failsafe) in one report.
       -->
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>@{surefireArgLine}</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <argLine>@{failsafeArgLine}</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <configuration>
@@ -138,11 +152,51 @@
           </excludes>
         </configuration>
         <executions>
+          <!--
+            Unit tests (surefire) and integration tests (failsafe) run in separate JVMs, so each gets
+            its own file and append=false: a stale file from an earlier run cannot inflate the gate,
+            and one JVM cannot overwrite the other's data. They are merged before report and checks.
+          -->
           <execution>
-            <id>agent</id>
+            <id>agent-ut</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco-ut.exec</destFile>
+              <propertyName>surefireArgLine</propertyName>
+              <append>false</append>
+            </configuration>
+          </execution>
+          <execution>
+            <id>agent-it</id>
+            <goals>
+              <goal>prepare-agent-integration</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco-it.exec</destFile>
+              <propertyName>failsafeArgLine</propertyName>
+              <append>false</append>
+            </configuration>
+          </execution>
+          <execution>
+            <id>merge</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>merge</goal>
+            </goals>
+            <configuration>
+              <fileSets>
+                <fileSet>
+                  <directory>${project.build.directory}</directory>
+                  <includes>
+                    <include>jacoco-ut.exec</include>
+                    <include>jacoco-it.exec</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+              <destFile>${project.build.directory}/jacoco.exec</destFile>
+            </configuration>
           </execution>
           <execution>
             <id>report</id>
