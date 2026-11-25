@@ -20,6 +20,7 @@
   <modules>
     <module>libs/contract-testing</module>
     <module>services/catalog-service</module>
+    <module>services/booking-service</module>
   </modules>
 
   <properties>

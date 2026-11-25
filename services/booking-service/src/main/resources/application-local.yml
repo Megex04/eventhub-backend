@@ -1,0 +1,18 @@
+# Local development profile: points at the docker-compose services.
+# Export POSTGRES_PASSWORD (see .env.example) before running; it deliberately has no default here.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${BOOKING_DB:booking}
+    username: ${POSTGRES_USER:eventhub}
+    password: ${POSTGRES_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Realm imported by docker-compose (docker/keycloak/eventhub-realm.json).
+          issuer-uri: ${OIDC_ISSUER_URI:http://localhost:${KEYCLOAK_PORT:8080}/realms/eventhub}
+
+management:
+  endpoint:
+    health:
+      show-details: always

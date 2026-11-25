@@ -88,6 +88,40 @@
       "realmRoles": [
         "ADMIN"
       ]
+    },
+    {
+      "id": "5b8e3c70-2d14-4a9f-b6e1-7c0a9d2f4e04",
+      "username": "customer1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Carla",
+      "lastName": "Customer",
+      "email": "customer1@eventhub.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer1_dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": []
+    },
+    {
+      "id": "e4a1d7b3-6f28-4c5e-9a03-1b8c5d7e2f05",
+      "username": "customer2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Carlos",
+      "lastName": "Customer",
+      "email": "customer2@eventhub.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer2_dev",
+          "temporary": false
+        }
+      ],
+      "realmRoles": []
     }
   ]
 }
