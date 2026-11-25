@@ -277,6 +277,11 @@ public final class Booking {
     return items;
   }
 
+  /** The items as inventory lines: what to reserve now and what to release on a transition. */
+  public List<RequestedItem> requestedItems() {
+    return items.stream().map(item -> new RequestedItem(item.zoneId(), item.quantity())).toList();
+  }
+
   public Money total() {
     return total;
   }

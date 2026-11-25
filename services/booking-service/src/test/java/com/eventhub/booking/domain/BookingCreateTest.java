@@ -43,6 +43,15 @@ class BookingCreateTest {
   }
 
   @Test
+  void should_expose_the_items_as_inventory_lines() {
+    Booking booking =
+        create(openEvent(), new RequestedItem(VIP_ZONE, 2), new RequestedItem(GENERAL_ZONE, 3));
+
+    assertThat(booking.requestedItems())
+        .containsExactly(new RequestedItem(VIP_ZONE, 2), new RequestedItem(GENERAL_ZONE, 3));
+  }
+
+  @Test
   void should_hold_for_the_duration_given_by_the_policy() {
     Booking booking =
         Booking.create(
