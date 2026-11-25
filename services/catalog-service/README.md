@@ -180,7 +180,7 @@ agregado**: un evento no se envia mientras haya otro anterior del mismo agregado
 - `GET /actuator/health/liveness` y `/readiness` (publicos), `GET /actuator/info`.
 - `GET /actuator/prometheus` **requiere token** (cualquier usuario autenticado). Metricas del outbox:
   `outbox_pending` (filas que aun se reintentan), `outbox_parked` (sin intentos), `outbox_oldest_age_seconds`,
-  `outbox_published_total`, `outbox_failures_total`.
+  `outbox_published_total`, `outbox_failures_total` y `outbox_parkings_total` (veces que una fila se aparco).
   ```bash
   curl -s localhost:8081/actuator/prometheus -H "$AUTH" | grep '^outbox_'
   ```

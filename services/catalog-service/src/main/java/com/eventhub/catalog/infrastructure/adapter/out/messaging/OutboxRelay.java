@@ -96,8 +96,8 @@ public class OutboxRelay {
     this.failures =
         Counter.builder("outbox.failures").description("Failed send attempts").register(meters);
     this.parked =
-        Counter.builder("outbox.parked.total")
-            .description("Rows that ran out of attempts")
+        Counter.builder("outbox.parkings")
+            .description("Times a row ran out of attempts and was parked")
             .register(meters);
   }
 

@@ -202,7 +202,7 @@ class OutboxRelayIT extends MessagingIntegrationTest {
             "SELECT id FROM outbox_event WHERE aggregate_id = ? AND event_type = 'EventPublished'",
             UUID.class,
             eventId);
-    double parkedBefore = count("outbox.parked.total");
+    double parkedBefore = count("outbox.parkings");
 
     broker.failAlways();
     for (int attempt = 0; attempt < 5; attempt++) {
@@ -213,7 +213,7 @@ class OutboxRelayIT extends MessagingIntegrationTest {
     assertThat(row(publishRow).get("attempts")).isEqualTo(5);
     assertThat(gauge("outbox.parked")).isEqualTo(1);
     assertThat(gauge("outbox.pending")).as("the reschedule still waits").isEqualTo(1);
-    assertThat(count("outbox.parked.total") - parkedBefore).isEqualTo(1);
+    assertThat(count("outbox.parkings") - parkedBefore).isEqualTo(1);
 
     broker.reset();
     assertThat(drain()).as("a parked row is not retried and keeps its aggregate blocked").isZero();

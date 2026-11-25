@@ -39,10 +39,14 @@ class ObservabilityIT extends WebIntegrationTest {
             .getResponse()
             .getContentAsString();
 
+    // Whole metric names: a counter called outbox_parked_total once hid the outbox_parked gauge.
     assertThat(scrape)
-        .contains("outbox_pending")
-        .contains("outbox_parked")
-        .contains("outbox_oldest_age_seconds")
+        .containsPattern("(?m)^outbox_pending[ {]")
+        .containsPattern("(?m)^outbox_parked[ {]")
+        .containsPattern("(?m)^outbox_oldest_age_seconds[ {]")
+        .containsPattern("(?m)^outbox_published_total[ {]")
+        .containsPattern("(?m)^outbox_failures_total[ {]")
+        .containsPattern("(?m)^outbox_parkings_total[ {]")
         .contains("jvm_memory_used_bytes");
   }
 
