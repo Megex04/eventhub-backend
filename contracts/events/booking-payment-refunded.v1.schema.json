@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eventhub.dev/schemas/events/booking-payment-refunded.v1.schema.json",
+  "title": "BookingPaymentRefunded v1",
+  "description": "Se reembolso un pago: la reserva dejo de ser pagable durante el cobro, o se cancelo una reserva CONFIRMED. Routing key: `booking.booking.payment-refunded.v1`.",
+  "allOf": [
+    {
+      "$ref": "envelope.v1.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "BookingPaymentRefunded"
+        },
+        "version": {
+          "const": 1
+        },
+        "producer": {
+          "const": "booking-service"
+        },
+        "data": {
+          "type": "object",
+          "required": [
+            "bookingId",
+            "userId",
+            "eventId",
+            "paymentId",
+            "amount",
+            "reason",
+            "refundedAt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "bookingId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "userId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "paymentId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "amount": {
+              "$ref": "common.v1.schema.json#/$defs/Money"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "BOOKING_EXPIRED_DURING_PAYMENT",
+                "BOOKING_CANCELLED",
+                "EVENT_CANCELLED"
+              ]
+            },
+            "refundedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

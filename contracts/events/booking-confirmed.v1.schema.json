@@ -25,6 +25,7 @@
             "bookingId",
             "userId",
             "eventId",
+            "paymentId",
             "total",
             "confirmedAt"
           ],
@@ -39,6 +40,10 @@
               "format": "uuid"
             },
             "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "paymentId": {
               "type": "string",
               "format": "uuid"
             },
