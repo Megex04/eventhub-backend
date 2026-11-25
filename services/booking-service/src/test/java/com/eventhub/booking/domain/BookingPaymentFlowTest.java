@@ -15,7 +15,7 @@ class BookingPaymentFlowTest {
 
   private Booking payingBooking() {
     Booking booking = pendingBooking();
-    booking.beginPayment(PAYMENT, clock);
+    booking.beginPayment(PAYMENT, TOKEN, clock);
     booking.pullDomainEvents();
     return booking;
   }
@@ -28,7 +28,7 @@ class BookingPaymentFlowTest {
   void should_start_a_payment_for_exactly_the_total_of_the_booking() {
     Booking booking = pendingBooking();
 
-    Payment payment = booking.beginPayment(PAYMENT, clock);
+    Payment payment = booking.beginPayment(PAYMENT, TOKEN, clock);
 
     assertThat(payment.id()).isEqualTo(PAYMENT);
     assertThat(payment.amount()).isEqualTo(booking.total());
@@ -41,7 +41,7 @@ class BookingPaymentFlowTest {
   void should_refuse_a_second_attempt_while_one_is_in_progress() {
     Booking booking = payingBooking();
 
-    assertThatThrownBy(() -> booking.beginPayment(NEXT_PAYMENT, clock))
+    assertThatThrownBy(() -> booking.beginPayment(NEXT_PAYMENT, TOKEN, clock))
         .isInstanceOfSatisfying(
             PaymentInProgressException.class, e -> assertThat(e.paymentId()).isEqualTo(PAYMENT));
     assertThat(paymentOf(booking).id()).isEqualTo(PAYMENT);
@@ -52,7 +52,7 @@ class BookingPaymentFlowTest {
     Booking booking = payingBooking();
     booking.declinePayment();
 
-    Payment retry = booking.beginPayment(NEXT_PAYMENT, clock);
+    Payment retry = booking.beginPayment(NEXT_PAYMENT, TOKEN, clock);
 
     assertThat(retry.id()).isEqualTo(NEXT_PAYMENT);
     assertThat(retry.status()).isEqualTo(PaymentStatus.INITIATED);

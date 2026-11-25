@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 class BookingStateMachineTest {
 
   private enum Action {
-    PAY(NOW.plusSeconds(1), (b, clock) -> b.beginPayment(NEXT_PAYMENT, clock)),
+    PAY(NOW.plusSeconds(1), (b, clock) -> b.beginPayment(NEXT_PAYMENT, TOKEN, clock)),
     EXPIRE(EXPIRES_AT, (b, clock) -> b.expire(clock)),
     CANCEL_BY_USER(
         NOW.plusSeconds(1), (b, clock) -> b.cancel(CancelReason.USER_REQUEST, EVENT_STARTS, clock)),

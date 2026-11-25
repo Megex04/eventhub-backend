@@ -18,6 +18,7 @@ final class BookingFixtures {
   static final UUID GENERAL_ZONE = uuid(5);
   static final UUID PAYMENT = uuid(6);
   static final UUID NEXT_PAYMENT = uuid(7);
+  static final String TOKEN = "tok_approved";
 
   static final Instant NOW = Instant.parse("2026-12-01T10:00:00Z");
   static final Instant EVENT_STARTS = Instant.parse("2027-01-10T20:00:00Z");
@@ -61,7 +62,8 @@ final class BookingFixtures {
 
   /** Restores a booking in {@code status}; a CONFIRMED one carries its CAPTURED payment. */
   static Booking restored(BookingStatus status) {
-    Payment captured = Payment.restore(PAYMENT, PaymentStatus.CAPTURED, total(), Optional.empty());
+    Payment captured =
+        Payment.restore(PAYMENT, PaymentStatus.CAPTURED, total(), TOKEN, Optional.empty());
     return Booking.restore(
         BOOKING,
         USER,

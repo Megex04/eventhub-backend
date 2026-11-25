@@ -11,6 +11,10 @@ import java.util.UUID;
  * duplicated, late, out of order or replayed. It is monotonic: a message is applied only when its
  * {@code occurredAt} is not older than the last one applied (equal timestamps are accepted, so a
  * replay of the same state is harmless), and CANCELLED is terminal.
+ *
+ * <p>A cancellation can arrive before the publication it cancels. It is kept as a
+ * <em>tombstone</em> (CANCELLED, no dates, no zones) so that the publication, when it comes, is
+ * ignored.
  */
 public final class EventProjection {
 
@@ -23,6 +27,7 @@ public final class EventProjection {
 
   private final UUID eventId;
   private EventSaleStatus status;
+  // Absent only in a tombstone, which never had a schedule.
   private Instant startsAt;
   private Instant endsAt;
   private List<ProjectedZone> zones;
@@ -56,15 +61,24 @@ public final class EventProjection {
     return new EventProjection(eventId, EventSaleStatus.OPEN, startsAt, endsAt, zones, occurredAt);
   }
 
+  /** A cancellation received before the event was ever published here. */
+  public static EventProjection cancelledTombstone(UUID eventId, Instant occurredAt) {
+    Validation.requiredId("eventId", eventId);
+    Validation.required("occurredAt", occurredAt);
+    return new EventProjection(
+        eventId, EventSaleStatus.CANCELLED, null, null, List.of(), occurredAt);
+  }
+
   /** Rebuilds the projection from persisted state without re-validating. */
   public static EventProjection restore(
       UUID eventId,
       EventSaleStatus status,
-      Instant startsAt,
-      Instant endsAt,
+      Optional<Instant> startsAt,
+      Optional<Instant> endsAt,
       List<ProjectedZone> zones,
       Instant lastOccurredAt) {
-    return new EventProjection(eventId, status, startsAt, endsAt, zones, lastOccurredAt);
+    return new EventProjection(
+        eventId, status, startsAt.orElse(null), endsAt.orElse(null), zones, lastOccurredAt);
   }
 
   /** Also the entry point of a replay: it refreshes the data of an event that is still open. */
@@ -100,6 +114,11 @@ public final class EventProjection {
     return status == EventSaleStatus.OPEN && clock.instant().isBefore(startsAt);
   }
 
+  /** True when only the cancellation is known: there is nothing to show or to sell. */
+  public boolean isTombstone() {
+    return zones.isEmpty();
+  }
+
   public Optional<ProjectedZone> zone(UUID zoneId) {
     return zones.stream().filter(zone -> zone.zoneId().equals(zoneId)).findFirst();
   }
@@ -112,12 +131,12 @@ public final class EventProjection {
     return status;
   }
 
-  public Instant startsAt() {
-    return startsAt;
+  public Optional<Instant> startsAt() {
+    return Optional.ofNullable(startsAt);
   }
 
-  public Instant endsAt() {
-    return endsAt;
+  public Optional<Instant> endsAt() {
+    return Optional.ofNullable(endsAt);
   }
 
   public List<ProjectedZone> zones() {

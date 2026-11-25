@@ -24,7 +24,7 @@ class BookingTimeBoundaryTest {
     Booking booking = pendingBooking();
     clock.set(EXPIRES_AT.minus(TICK));
 
-    Payment payment = booking.beginPayment(PAYMENT, clock);
+    Payment payment = booking.beginPayment(PAYMENT, TOKEN, clock);
 
     assertThat(payment.status()).isEqualTo(PaymentStatus.INITIATED);
   }
@@ -34,7 +34,7 @@ class BookingTimeBoundaryTest {
     Booking booking = pendingBooking();
     clock.set(EXPIRES_AT);
 
-    assertThatThrownBy(() -> booking.beginPayment(PAYMENT, clock))
+    assertThatThrownBy(() -> booking.beginPayment(PAYMENT, TOKEN, clock))
         .isInstanceOf(InvalidStateException.class);
     assertThat(booking.payment()).isEmpty();
   }
@@ -44,7 +44,7 @@ class BookingTimeBoundaryTest {
     Booking booking = pendingBooking();
     clock.set(EXPIRES_AT.plusSeconds(1));
 
-    assertThatThrownBy(() -> booking.beginPayment(PAYMENT, clock))
+    assertThatThrownBy(() -> booking.beginPayment(PAYMENT, TOKEN, clock))
         .isInstanceOf(InvalidStateException.class);
   }
 
@@ -84,7 +84,7 @@ class BookingTimeBoundaryTest {
   @Test
   void should_confirm_a_charge_captured_one_tick_before_the_hold_ends() {
     Booking booking = pendingBooking();
-    booking.beginPayment(PAYMENT, clock);
+    booking.beginPayment(PAYMENT, TOKEN, clock);
     clock.set(EXPIRES_AT.minus(TICK));
 
     CaptureOutcome outcome = booking.capturePayment(clock);
@@ -96,7 +96,7 @@ class BookingTimeBoundaryTest {
   @Test
   void should_demand_a_refund_for_a_charge_captured_exactly_when_the_hold_ends() {
     Booking booking = pendingBooking();
-    booking.beginPayment(PAYMENT, clock);
+    booking.beginPayment(PAYMENT, TOKEN, clock);
     clock.set(EXPIRES_AT);
 
     CaptureOutcome outcome = booking.capturePayment(clock);

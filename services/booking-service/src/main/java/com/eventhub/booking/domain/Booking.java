@@ -159,7 +159,7 @@ public final class Booking {
    * Records the intention to charge: a payment INITIATED for exactly the total. Fails if the hold
    * ended, or if an attempt is still active; a DECLINED one does not block a new attempt.
    */
-  public Payment beginPayment(UUID paymentId, Clock clock) {
+  public Payment beginPayment(UUID paymentId, String paymentToken, Clock clock) {
     Validation.requiredId("paymentId", paymentId);
     requireStatus("pay", BookingStatus.PENDING);
     if (!clock.instant().isBefore(expiresAt)) {
@@ -168,7 +168,7 @@ public final class Booking {
     if (payment != null && payment.isActive()) {
       throw new PaymentInProgressException(payment.id());
     }
-    this.payment = Payment.initiate(paymentId, total);
+    this.payment = Payment.initiate(paymentId, total, paymentToken);
     return payment;
   }
 

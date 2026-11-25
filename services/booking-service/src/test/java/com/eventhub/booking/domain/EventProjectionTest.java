@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +36,7 @@ class EventProjectionTest {
     EventProjection projection = published(T0);
 
     assertThat(projection.status()).isEqualTo(EventSaleStatus.OPEN);
-    assertThat(projection.startsAt()).isEqualTo(STARTS);
+    assertThat(projection.startsAt()).contains(STARTS);
     assertThat(projection.lastOccurredAt()).isEqualTo(T0);
     assertThat(projection.zone(ZONE)).contains(VIP);
     assertThat(projection.zone(UUID.randomUUID())).isEmpty();
@@ -82,7 +83,7 @@ class EventProjectionTest {
             newStart, newStart.plus(Duration.ofHours(3)), T0.plusSeconds(5));
 
     assertThat(result).isEqualTo(ApplyResult.APPLIED);
-    assertThat(projection.startsAt()).isEqualTo(newStart);
+    assertThat(projection.startsAt()).contains(newStart);
     assertThat(projection.lastOccurredAt()).isEqualTo(T0.plusSeconds(5));
   }
 
@@ -97,7 +98,7 @@ class EventProjectionTest {
         projection.applyRescheduled(stale, stale.plus(Duration.ofHours(3)), T0.plusSeconds(5));
 
     assertThat(result).isEqualTo(ApplyResult.IGNORED_STALE);
-    assertThat(projection.startsAt()).isEqualTo(latest);
+    assertThat(projection.startsAt()).contains(latest);
     assertThat(projection.lastOccurredAt()).isEqualTo(T0.plusSeconds(10));
   }
 
@@ -111,7 +112,7 @@ class EventProjectionTest {
     ApplyResult again = projection.applyRescheduled(newStart, newEnd, T0.plusSeconds(5));
 
     assertThat(again).isEqualTo(ApplyResult.APPLIED);
-    assertThat(projection.startsAt()).isEqualTo(newStart);
+    assertThat(projection.startsAt()).contains(newStart);
     assertThat(projection.status()).isEqualTo(EventSaleStatus.OPEN);
   }
 
@@ -175,7 +176,7 @@ class EventProjectionTest {
             newStart, newStart.plus(Duration.ofHours(3)), T0.plusSeconds(90));
 
     assertThat(result).isEqualTo(ApplyResult.IGNORED_CANCELLED);
-    assertThat(projection.startsAt()).isEqualTo(STARTS);
+    assertThat(projection.startsAt()).contains(STARTS);
   }
 
   @Test
@@ -211,7 +212,12 @@ class EventProjectionTest {
   void should_rebuild_the_exact_state_when_restored() {
     EventProjection restored =
         EventProjection.restore(
-            EVENT, EventSaleStatus.CANCELLED, STARTS, ENDS, List.of(VIP), T0.plusSeconds(9));
+            EVENT,
+            EventSaleStatus.CANCELLED,
+            Optional.of(STARTS),
+            Optional.of(ENDS),
+            List.of(VIP),
+            T0.plusSeconds(9));
 
     assertThat(restored.status()).isEqualTo(EventSaleStatus.CANCELLED);
     assertThat(restored.lastOccurredAt()).isEqualTo(T0.plusSeconds(9));
@@ -223,5 +229,45 @@ class EventProjectionTest {
     assertThatThrownBy(() -> new ProjectedZone(ZONE, "VIP", Money.of("1.00", "PEN"), 0))
         .isInstanceOf(InvalidValueException.class)
         .hasFieldOrPropertyWithValue("field", "capacity");
+  }
+
+  @Test
+  void should_create_a_cancelled_tombstone_without_dates_or_zones() {
+    EventProjection tombstone = EventProjection.cancelledTombstone(EVENT, T0);
+
+    assertThat(tombstone.status()).isEqualTo(EventSaleStatus.CANCELLED);
+    assertThat(tombstone.isTombstone()).isTrue();
+    assertThat(tombstone.startsAt()).isEmpty();
+    assertThat(tombstone.endsAt()).isEmpty();
+    assertThat(tombstone.zones()).isEmpty();
+    assertThat(tombstone.lastOccurredAt()).isEqualTo(T0);
+    assertThat(tombstone.isOnSale(at(T0))).isFalse();
+  }
+
+  @Test
+  void should_not_treat_a_real_projection_as_a_tombstone() {
+    assertThat(published(T0).isTombstone()).isFalse();
+    EventProjection cancelled = published(T0);
+    cancelled.applyCancelled(T0.plusSeconds(1));
+    assertThat(cancelled.isTombstone()).isFalse();
+  }
+
+  @Test
+  void should_ignore_a_publication_that_arrives_after_the_tombstone_whatever_its_timestamp() {
+    EventProjection tombstone = EventProjection.cancelledTombstone(EVENT, T0.plusSeconds(60));
+
+    assertThat(tombstone.applyPublished(STARTS, ENDS, List.of(VIP), T0))
+        .isEqualTo(ApplyResult.IGNORED_CANCELLED);
+    assertThat(tombstone.applyPublished(STARTS, ENDS, List.of(VIP), T0.plusSeconds(120)))
+        .isEqualTo(ApplyResult.IGNORED_CANCELLED);
+    assertThat(tombstone.isTombstone()).isTrue();
+  }
+
+  @Test
+  void should_reject_a_tombstone_without_event_id_or_timestamp() {
+    assertThatThrownBy(() -> EventProjection.cancelledTombstone(null, T0))
+        .isInstanceOf(InvalidValueException.class);
+    assertThatThrownBy(() -> EventProjection.cancelledTombstone(EVENT, null))
+        .isInstanceOf(InvalidValueException.class);
   }
 }

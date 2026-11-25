@@ -10,33 +10,43 @@ import java.util.UUID;
  * booking's total by construction.
  *
  * <p>{@code id} is the idempotency key the payment gateway receives for both charge and refund.
+ * {@code paymentToken} is the opaque {@code tok_...} the customer sent (never card data); it is
+ * kept so a charge whose outcome is unknown can be repeated by the reconciler.
  */
 public final class Payment {
 
   private final UUID id;
   private final PaymentStatus status;
   private final Money amount;
+  private final String paymentToken;
   private final RefundReason refundReason;
 
-  private Payment(UUID id, PaymentStatus status, Money amount, RefundReason refundReason) {
+  private Payment(
+      UUID id, PaymentStatus status, Money amount, String paymentToken, RefundReason refundReason) {
     this.id = id;
     this.status = status;
     this.amount = amount;
+    this.paymentToken = paymentToken;
     this.refundReason = refundReason;
   }
 
-  static Payment initiate(UUID id, Money amount) {
+  static Payment initiate(UUID id, Money amount, String paymentToken) {
     return new Payment(
         Validation.requiredId("id", id),
         PaymentStatus.INITIATED,
         Validation.required("amount", amount),
+        Validation.required("paymentToken", paymentToken),
         null);
   }
 
   /** Rebuilds a payment from persisted state without re-validating. */
   public static Payment restore(
-      UUID id, PaymentStatus status, Money amount, Optional<RefundReason> refundReason) {
-    return new Payment(id, status, amount, refundReason.orElse(null));
+      UUID id,
+      PaymentStatus status,
+      Money amount,
+      String paymentToken,
+      Optional<RefundReason> refundReason) {
+    return new Payment(id, status, amount, paymentToken, refundReason.orElse(null));
   }
 
   Payment capture() {
@@ -78,12 +88,16 @@ public final class Payment {
     return amount;
   }
 
+  public String paymentToken() {
+    return paymentToken;
+  }
+
   public Optional<RefundReason> refundReason() {
     return Optional.ofNullable(refundReason);
   }
 
   private Payment next(PaymentStatus nextStatus, RefundReason reason) {
-    return new Payment(id, nextStatus, amount, reason);
+    return new Payment(id, nextStatus, amount, paymentToken, reason);
   }
 
   private void requireStatus(PaymentStatus expected, String action) {

@@ -18,6 +18,7 @@ class PaymentTest {
 
   private static final UUID ID = UUID.fromString("00000000-0000-4000-8000-0000000000b1");
   private static final Money AMOUNT = Money.of("150.00", "PEN");
+  private static final String TOKEN = "tok_approved";
 
   private enum Action {
     CAPTURE(p -> p.capture()),
@@ -47,7 +48,7 @@ class PaymentTest {
           PaymentStatus.REFUNDED, Map.of());
 
   private static Payment in(PaymentStatus status) {
-    return Payment.restore(ID, status, AMOUNT, Optional.empty());
+    return Payment.restore(ID, status, AMOUNT, TOKEN, Optional.empty());
   }
 
   static Stream<Arguments> illegalMoves() {
@@ -67,11 +68,12 @@ class PaymentTest {
 
   @Test
   void should_start_initiated_with_the_given_amount() {
-    Payment payment = Payment.initiate(ID, AMOUNT);
+    Payment payment = Payment.initiate(ID, AMOUNT, TOKEN);
 
     assertThat(payment.status()).isEqualTo(PaymentStatus.INITIATED);
     assertThat(payment.id()).isEqualTo(ID);
     assertThat(payment.amount()).isEqualTo(AMOUNT);
+    assertThat(payment.paymentToken()).isEqualTo(TOKEN);
     assertThat(payment.refundReason()).isEmpty();
   }
 
@@ -101,7 +103,7 @@ class PaymentTest {
 
   @Test
   void should_leave_the_original_untouched_when_it_transitions() {
-    Payment initiated = Payment.initiate(ID, AMOUNT);
+    Payment initiated = Payment.initiate(ID, AMOUNT, TOKEN);
 
     initiated.capture();
 
@@ -132,8 +134,9 @@ class PaymentTest {
 
   @Test
   void should_reject_a_missing_id_or_amount_when_initiated() {
-    assertThatThrownBy(() -> Payment.initiate(null, AMOUNT))
+    assertThatThrownBy(() -> Payment.initiate(null, AMOUNT, TOKEN))
         .isInstanceOf(InvalidValueException.class);
-    assertThatThrownBy(() -> Payment.initiate(ID, null)).isInstanceOf(InvalidValueException.class);
+    assertThatThrownBy(() -> Payment.initiate(ID, null, TOKEN))
+        .isInstanceOf(InvalidValueException.class);
   }
 }
