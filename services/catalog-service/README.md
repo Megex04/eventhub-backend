@@ -59,8 +59,9 @@ Cobertura: el build **falla** si el dominio queda por debajo del 90 % de lineas;
 
 ## Probar la API con curl
 
-Usuarios del realm (solo desarrollo): `organizer` / `organizer_dev` (rol `ORGANIZER`) y
-`attendee` / `attendee_dev` (sin rol). Client publico: `eventhub-web`.
+Usuarios del realm (solo desarrollo): `organizer` / `organizer_dev` (rol `ORGANIZER`),
+`attendee` / `attendee_dev` (sin rol) y `admin` / `admin_dev` (rol `ADMIN`, solo para la reemision de
+eventos). Client publico: `eventhub-web`.
 
 ### 1. Token
 
@@ -175,6 +176,54 @@ Garantias: el cambio y su evento se guardan juntos o ninguno; `messageId` es el 
 al reintentar; la entrega es **at-least-once** (los consumidores deben ser idempotentes); el orden es **por
 agregado**: un evento no se envia mientras haya otro anterior del mismo agregado sin publicar.
 
+## Reemitir eventos
+
+Cuando un consumidor nuevo (o con la cola recreada) debe ponerse al dia, el catalogo puede volver a escribir
+en el outbox el **estado actual** de sus eventos. Es una operacion administrativa: `POST /actuator/replay`,
+solo para el rol **`ADMIN`** (un `ORGANIZER` recibe 403) y fuera de la API publica y del OpenAPI.
+**Antes**, el consumidor debe tener su cola declarada y enlazada.
+
+| Estado del evento | Que se reemite |
+|---|---|
+| `PUBLISHED` | `EventPublished` con las fechas, el venue y las zonas vigentes |
+| `CANCELLED` | `EventPublished` y despues `EventCancelled` |
+| `DRAFT` | nada |
+
+```bash
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:8080/realms/eventhub/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=eventhub-web -d username=admin -d password=admin_dev \
+  | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+
+# todo el catalogo, en lotes de 100 (limit opcional, maximo 500)
+curl -s -X POST localhost:8081/actuator/replay -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{}'
+# {"events":3,"messages":4,"conflicts":0}
+
+# un solo evento
+curl -s -X POST localhost:8081/actuator/replay -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"eventId":"'$EVENT_ID'"}'
+```
+
+Para recorrer un catalogo grande por lotes, repite la llamada con el cursor que devuelve la anterior:
+
+```bash
+curl -s -X POST localhost:8081/actuator/replay -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"limit":2}'
+# {"events":2,"messages":2,"conflicts":0,"next":"e5ef40db-13a5-48f4-b78d-561cfbeb21c4"}
+curl -s -X POST localhost:8081/actuator/replay -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"limit":2,"after":"e5ef40db-13a5-48f4-b78d-561cfbeb21c4"}'
+# {"events":1,"messages":2,"conflicts":0}        <- sin "next": no queda nada
+```
+
+- La respuesta cuenta `events` (reemitidos), `messages` (filas de outbox escritas), `conflicts` (eventos que
+  alguien modifico justo en ese momento: se saltan y basta repetir la llamada) y `next` (solo si puede quedar mas).
+- Cada reemision usa `messageId` **nuevos**, el mismo `eventId` y pasa por el relay normal (orden por agregado,
+  reintentos, aparcado); el consumidor la distingue de un duplicado por su `eventId`, no por el `messageId`.
+- `occurredAt` es la fecha del ultimo cambio del evento (la publicacion original no se guarda). La reemision
+  aumenta la `version` del evento en 1 y no cambia nada mas. Repetirla es seguro: envia lo mismo otra vez.
+- Errores: sin token 401, sin rol `ADMIN` 403, `limit` fuera de 1..500 o `eventId` mal formado 400, evento
+  inexistente 404 (un borrador devuelve `events: 0`).
+
 ## Operacion
 
 - `GET /actuator/health/liveness` y `/readiness` (publicos), `GET /actuator/info`.
@@ -228,9 +277,8 @@ cola esta enlazada** a la routing key lo descarta y aun asi confirma. Por eso:
 - El servicio marca la fila como publicada aunque nadie la haya recibido, y **no existe una metrica de
   mensajes no enrutables** (el binder de Spring Cloud Stream no expone los mensajes devueltos).
 - Cada consumidor debe declarar su cola y su enlace **al arrancar**. Un consumidor nuevo no recibe lo que
-  se publico antes de existir; el procedimiento de puesta al dia (reemision administrativa de
-  `EventPublished`, consumidores idempotentes por `eventId`) esta decidido en
-  [ADR 0003](../../docs/adr/0003-event-bootstrap-and-replay.md) y **aun no esta implementado**.
+  se publico antes de existir; para ponerlo al dia se **reemiten** los eventos (ver "Reemitir eventos",
+  [ADR 0003](../../docs/adr/0003-event-bootstrap-and-replay.md)), y el consumidor debe ser idempotente por `eventId`.
 - Si tras publicar no ves el mensaje, comprueba primero que tu cola esta enlazada
   (`curl $RMQ/bindings/%2F/e/eventhub.events/q/demo.events`).
 

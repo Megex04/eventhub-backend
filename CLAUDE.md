@@ -144,6 +144,9 @@ infrastructure/
 - Rol `ORGANIZER` en el claim de roles del token (Keycloak: `realm_access.roles`); mapear a `ROLE_*`.
 - `organizerId`/`userId` salen del claim `sub`, **nunca** del body.
 - Validar propiedad del recurso (un organizador solo modifica sus eventos).
+- Operaciones administrativas (p. ej. reemision: `POST /actuator/replay`) exigen el rol `ADMIN`, distinto de `ORGANIZER`, y no
+  se publican en el OpenAPI. Reemitir envia el **estado actual** (nunca borradores); los consumidores deben ser
+  idempotentes por `eventId` (`docs/adr/0003-event-bootstrap-and-replay.md`).
 - Secretos por variables de entorno / Key Vault; nunca en `application.yml` versionado.
 - El emisor de tokens se configura con `OIDC_ISSUER_URI` (`spring.security.oauth2.resourceserver.jwt.issuer-uri`),
   sin valor por defecto salvo en el perfil `local`.

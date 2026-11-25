@@ -81,4 +81,5 @@ puede reemitirse; ver ADR 0003).
   extrae a un modulo de test compartido (`contracts-test`) para no duplicarlo y para fijar en un unico
   sitio la version de la libreria de esquemas.
 - Sin metrica de mensajes no enrutables (limite del binder).
-- El bootstrap y la reemision de `EventPublished` (ADR 0003) estan decididos pero no implementados.
+- La reemision administrativa (ADR 0003) esta implementada; falta aun la idempotencia por `eventId` en los
+  consumidores, que pertenece a `booking-service` y `notification-service`.

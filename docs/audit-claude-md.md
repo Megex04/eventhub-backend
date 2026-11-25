@@ -1,6 +1,6 @@
 # Auditoria de `catalog-service` contra CLAUDE.md
 
-Fecha: 2026-11-24 · Estado del build: `./mvnw verify` en verde (ver "Resultado") · Alcance: M1-M7 de
+Fecha: 2026-11-24 (actualizada en M8, 2026-11-25) · Estado del build: `./mvnw verify` en verde (ver "Resultado") · Alcance: M1-M8 de
 `catalog-service` (los otros servicios estan fuera de alcance del prompt 01).
 
 Leyenda: **Cumple** = hay test, regla ArchUnit o configuracion que lo demuestra. **Parcial** = se
@@ -92,6 +92,7 @@ justificacion. **N/A** = no aplica todavia a este servicio.
 | At-least-once | Cumple | confirmacion antes de marcar (`BrokerOutageIT`: mismo `messageId` al reenviar). |
 | Consumidores idempotentes (`processed_message`) | N/A | El catalogo no consume. Pendiente en los consumidores; reemision y `eventId`: ADR 0003. |
 | Cambios de esquema compatibles / `v2` | N/A | Solo existe v1. |
+| Reemision administrativa del estado actual (ADR 0003, M8) | Cumple | `EventReplayTest`, `EventReplayServiceTest`, contrato de `findReplayable` (fake y JPA) y `ReplayEndpointIT`: estados mixtos, borrador excluido, orden, `messageId` nuevos, payloads validados contra los JSON Schemas, idempotencia, paginacion y conflictos. Mutacion que reemite borradores: 9 tests fallan. |
 | Test de contrato de todo productor/consumidor | Parcial | Productor: cumple (`EventSchemaContractTest` y el IT que valida el mensaje entregado). Consumidores: N/A. |
 
 ## Seguridad
@@ -100,6 +101,7 @@ justificacion. **N/A** = no aplica todavia a este servicio.
 |---|---|---|
 | Lecturas publicas solo donde el OpenAPI lo indique | **Desviacion** | `GET /events` y `GET /events/{id}` (`security: []`) y ademas `/actuator/health/**` e `/actuator/info`, que **no** estan en el OpenAPI: son las sondas de liveness/readiness. `SecurityIT`. |
 | Rol `ORGANIZER` desde `realm_access.roles` a `ROLE_*` | Cumple | `KeycloakRealmRolesConverterTest`, `SecurityIT`. |
+| Operaciones administrativas fuera de la API publica y con un rol distinto (M8) | Cumple | `POST /actuator/replay` exige `ADMIN`, no `ORGANIZER`, y no esta en el OpenAPI (sigue en verde `OpenApiConformanceIT`). `ReplayEndpointIT`: 401 sin token, 403 con `ORGANIZER` y sin rol, y un `ADMIN` recibe 403 en `/api/v1`. |
 | `organizerId`/`userId` del `sub`, nunca del body | Cumple | `EventsControllerIT.should_take_the_organizer_from_the_token_when_the_body_names_someone_else`. |
 | Validar propiedad del recurso | Cumple | `EventOwnershipTest` y los IT (403 / 404 si no es visible). |
 | Secretos por entorno, no en `application.yml` | Cumple | sin valores por defecto para contrasenas; ver regla 6. |
@@ -120,11 +122,11 @@ justificacion. **N/A** = no aplica todavia a este servicio.
 
 | Regla | Estado | Evidencia / justificacion |
 |---|---|---|
-| Piramide: unitarios > integracion > pocos E2E | Cumple | 367 unitarios, 215 de integracion (Testcontainers), 0 E2E dedicados: el flujo completo curl del README hace de prueba E2E manual. |
+| Piramide: unitarios > integracion > pocos E2E | Cumple | 389 unitarios, 238 de integracion (Testcontainers), 0 E2E dedicados: el flujo completo curl del README hace de prueba E2E manual. |
 | Nombres `should_<resultado>_when_<condicion>`, un concepto por test | Cumple / Parcial | Nombres: `TestConventionsTest` (todos cumplen). "Un concepto por test" es revision. |
 | Sin `Thread.sleep` (Awaitility) | Cumple | `TestConventionsTest.tests_never_sleep`; `BrokerOutageIT` usa Awaitility. |
-| Cobertura dominio >= 90 %, aplicacion >= 80 % | Cumple | JaCoCo: el build **falla** bajo 90 % en dominio; aplicacion solo se informa. Medido: dominio 100 %, aplicacion 99 %. |
-| ArchUnit en cada servicio | Cumple | `ArchitectureTest` (16 reglas) y `TestConventionsTest`, con mutaciones. |
+| Cobertura dominio >= 90 %, aplicacion >= 80 % | Cumple | JaCoCo: el build **falla** bajo 90 % en dominio; aplicacion solo se informa. Medido (tras M8): dominio 100 %, aplicacion 99,5 %. |
+| ArchUnit en cada servicio | Cumple | `ArchitectureTest` (17 reglas, incluida la del adaptador `adapter.in.admin`) y `TestConventionsTest`, con mutaciones. |
 
 ## Estilo y calidad
 
@@ -152,9 +154,9 @@ justificacion. **N/A** = no aplica todavia a este servicio.
 3. `/actuator/health` e `info` publicos y fuera del OpenAPI (sondas).
 4. `Optional` como parametro en un comando y en el criterio de busqueda.
 5. OTLP incluido pero desactivado por defecto.
-6. Sin metrica de mensajes no enrutables (limite del binder); bootstrap y reemision de `EventPublished`
-   decididos (ADR 0003) y **sin implementar**.
-7. DLQ y `processed_message`: pendientes en los consumidores.
+6. Sin metrica de mensajes no enrutables (limite del binder). La reemision de `EventPublished` (ADR 0003)
+   ya esta implementada (M8); falta la idempotencia por `eventId` en los consumidores.
+7. DLQ, `processed_message` e idempotencia por `eventId`: pendientes en los consumidores.
 8. Revisiones manuales sin chequeo automatico: controllers sin logica, longitud de metodos, datos
    personales en logs, "un concepto por test".
 
@@ -183,3 +185,21 @@ Matices honestos: la fila "aparcada" se simulo poniendo `attempts = 10` por SQL 
 contador `outbox.parked.total` colisionaba con el en la misma familia de metricas. Los tests lo daban por
 bueno al comparar subcadenas. Corregido en `7d3c464` (contador `outbox.parkings`) y `ObservabilityIT`
 ahora exige los nombres completos de metrica.
+
+### Verificacion de M8 (reemision)
+
+2026-11-25, contra Docker real (`docker compose down -v`, realm con el rol `ADMIN` recien importado) y el
+servicio en perfil `local`, **desde el repositorio de trabajo, no desde un clon limpio** (el clon limpio se
+hizo en M7):
+
+| Paso | Resultado |
+|---|---|
+| `./mvnw verify` | **BUILD SUCCESS**: 389 unitarios, 238 de integracion, ArchUnit (17 reglas), dominio 100 % |
+| Cuatro eventos (borrador, publicado, reprogramado a `Arena Lima`, cancelado) y cola de prueba purgada | los 5 mensajes originales entregados y descartados antes de reemitir |
+| `POST /actuator/replay` sin token / con `organizer` / con `admin` | 401 / 403 / 200 `{"events":3,"messages":4,"conflicts":0}` |
+| Mensajes reemitidos | el reprogramado con venue y fecha nuevos; el cancelado como `EventPublished` y `EventCancelled` (motivo incluido); el borrador, ninguno |
+| Paginacion `limit=2` y luego `after=<next>` | `{"events":2,...,"next":"..."}` y `{"events":1,...}` (sin `next`) |
+| Borrador por `eventId` / `admin` en `/api/v1/events` | `{"events":0,...}` / 403 |
+| Log del servicio | 0 lineas `ERROR` |
+
+Tras la prueba se bajo el stack con `docker compose down -v`.
