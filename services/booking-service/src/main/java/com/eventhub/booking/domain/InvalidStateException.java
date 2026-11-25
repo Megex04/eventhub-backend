@@ -25,6 +25,16 @@ public final class InvalidStateException extends DomainException {
         "Cannot expire a booking before its hold ends", currentStatus.name());
   }
 
+  /** The hold ended at {@code expiresAt}: the booking can no longer be paid. */
+  static InvalidStateException holdEnded(BookingStatus currentStatus) {
+    return new InvalidStateException(
+        "Cannot pay a booking whose hold has ended", currentStatus.name());
+  }
+
+  static InvalidStateException noPayment(BookingStatus currentStatus) {
+    return new InvalidStateException("The booking has no payment attempt", currentStatus.name());
+  }
+
   public String currentStatus() {
     return currentStatus;
   }
