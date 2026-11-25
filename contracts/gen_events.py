@@ -14,7 +14,9 @@ BASE = "https://eventhub.dev/schemas/events/"
 
 
 def write(name, schema):
-    (OUT / name).write_text(json.dumps(schema, indent=2, ensure_ascii=False) + "\n")
+    (OUT / name).write_text(
+        json.dumps(schema, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8", newline="\n")
 
 
 uuid = {"type": "string", "format": "uuid"}
