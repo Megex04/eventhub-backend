@@ -115,6 +115,8 @@ infrastructure/
 - Una BD por servicio; ningun servicio lee tablas de otro.
 - Evitar N+1 (`@EntityGraph`/fetch join explicito). `open-in-view=false`.
 - Indices justificados en la migracion que los crea.
+- Concurrencia optimista: cada guardado de un aggregate existente sube la version **exactamente en 1** y reclama la fila
+  antes de tocar filas hijas (ver `docs/adr/0004-event-versioning.md`); un conflicto es 409 `concurrent-modification`.
 
 ## Mensajeria
 
@@ -149,7 +151,8 @@ infrastructure/
 ## Observabilidad
 
 - Logs estructurados (JSON) con `traceId` y `correlationId`. Sin datos personales en logs.
-- Actuator: `health` (liveness/readiness) e `info`; `prometheus`/OTLP via Micrometer. Endpoints sensibles protegidos.
+- Actuator: `health` (liveness/readiness) e `info` publicos; `prometheus` exige token. Tracing (OpenTelemetry) pone `traceId`
+  en logs y problem+json; OTLP queda desactivado hasta configurar un endpoint. Endpoints sensibles protegidos.
 - Propagar `correlationId` del request HTTP al evento y de ahi a los consumidores: `X-Correlation-Id` (UUID valido o se genera) -> MDC -> `CorrelationIdProvider` -> envelope.
 
 ## Testing

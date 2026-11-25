@@ -160,4 +160,26 @@ justificacion. **N/A** = no aplica todavia a este servicio.
 
 ## Resultado de la prueba desde cero
 
-Ver la seccion final de este documento, que se completa al ejecutar la prueba en un clon limpio.
+Ejecutada el 2026-11-24 sobre el commit `7d3c464`, en una carpeta nueva (`git clone`), tras
+`docker compose down -v` (volumenes borrados):
+
+| Paso | Resultado |
+|---|---|
+| `cp .env.example .env` y `docker compose up -d --wait` | postgres, rabbitmq y keycloak *healthy* en ~25 s |
+| `./mvnw verify` | **BUILD SUCCESS** en 1:31: 367 tests unitarios y 215 de integracion, ArchUnit, spotless y las dos puertas de cobertura |
+| Arranque del servicio (perfil `local`, como en el README) | `readiness` UP a los ~15 s; 0 lineas `ERROR` en el log |
+| Token de Keycloak (`organizer`), exchange, cola y enlace | 201 / 201 / 201 |
+| Crear evento (`X-Correlation-Id` propio), anadir zona, publicar | 201 / 201 / 200 |
+| Mensaje en la cola | `catalog.event.published.v1`, `correlation_id` = el enviado |
+| Listados, `mine`, reprogramar, cancelar; 403 con `attendee`; 401 sin token | 200 / 200 / 200 / 200 / 403 / 401 |
+| `/actuator/prometheus` sin token / con token | 401 / 200, con las 6 metricas `outbox_*` |
+| Runbook de filas aparcadas | RabbitMQ pausado, evento cancelado (la API responde 200), fila llevada a 10 intentos con SQL, `outbox_parked` = 1, listada con la consulta del README, sigue aparcada al volver el broker, reencolada con el `UPDATE` del README: `outbox_parked` = 0 y el mensaje `catalog.event.cancelled.v1` llega |
+
+Matices honestos: la fila "aparcada" se simulo poniendo `attempts = 10` por SQL (agotarla de verdad exige
+10 fallos con backoff hasta 5 min; el comportamiento natural de aparcado esta probado en
+`OutboxRelayIT`). Maven reutilizo el repositorio local `~/.m2` (no se aislo la cache de dependencias).
+
+**Hallazgo de la prueba:** el gauge `outbox_parked` no aparecia en el scrape de Prometheus porque el
+contador `outbox.parked.total` colisionaba con el en la misma familia de metricas. Los tests lo daban por
+bueno al comparar subcadenas. Corregido en `7d3c464` (contador `outbox.parkings`) y `ObservabilityIT`
+ahora exige los nombres completos de metrica.
