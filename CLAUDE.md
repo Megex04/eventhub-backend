@@ -185,7 +185,8 @@ docker compose up -d                 # postgres, rabbitmq, keycloak
 
 ## Fuera de alcance (MVP)
 
-Pagos reales, asientos numerados, reembolsos, multi-moneda en una misma reserva, multi-tenant.
+Pagos y reembolsos REALES (la pasarela es siempre simulada; el reembolso total simulado SI esta en
+alcance en booking-service), reembolsos parciales, asientos numerados, multi-moneda en una misma reserva, multi-tenant.
 Tras `PUBLISHED`, las zonas de un evento son **inmutables** (solo `reschedule` y `cancel`).
 
 ## booking-service: reglas especificas
