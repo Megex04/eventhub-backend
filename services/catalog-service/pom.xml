@@ -100,6 +100,12 @@
       <artifactId>archunit-junit5</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Shared test helpers: event JSON Schemas and OpenAPI validator, read from contracts/. -->
+    <dependency>
+      <groupId>com.eventhub</groupId>
+      <artifactId>contract-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Checks real responses against contracts/openapi/catalog-api.yaml (status, headers, schema). -->
     <dependency>
       <groupId>com.atlassian.oai</groupId>

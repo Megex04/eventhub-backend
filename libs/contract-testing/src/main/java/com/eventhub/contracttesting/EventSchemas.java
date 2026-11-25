@@ -1,4 +1,4 @@
-package com.eventhub.catalog.support;
+package com.eventhub.contracttesting;
 
 import com.networknt.schema.AbsoluteIri;
 import com.networknt.schema.Error;
@@ -12,7 +12,7 @@ import com.networknt.schema.resource.InputStreamSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 
 /**
  * Validates JSON text against the schemas in {@code contracts/events}, loaded in place (never
@@ -27,12 +27,6 @@ public final class EventSchemas {
   private static final String ID_BASE = "https://eventhub.dev/schemas/events/";
   private static final Path DIRECTORY =
       Path.of("../../contracts/events").toAbsolutePath().normalize();
-
-  private static final Map<String, String> FILE_BY_TYPE =
-      Map.of(
-          "EventPublished", "event-published.v1.schema.json",
-          "EventCancelled", "event-cancelled.v1.schema.json",
-          "EventRescheduled", "event-rescheduled.v1.schema.json");
 
   private static final SchemaRegistry REGISTRY =
       SchemaRegistry.withDefaultDialect(
@@ -57,10 +51,18 @@ public final class EventSchemas {
     return () -> Files.newInputStream(file);
   }
 
+  /**
+   * {@code BookingPaymentRefunded} is described by {@code booking-payment-refunded.v1.schema.json}.
+   */
+  private static String fileOf(String eventType) {
+    return eventType.replaceAll("([a-z0-9])([A-Z])", "$1-$2").toLowerCase(Locale.ROOT)
+        + ".v1.schema.json";
+  }
+
   /** Empty when {@code json} is a valid message of that event type. */
   public static List<String> violations(String eventType, String json) {
-    String file = FILE_BY_TYPE.get(eventType);
-    if (file == null) {
+    String file = fileOf(eventType);
+    if (!Files.isRegularFile(DIRECTORY.resolve(file))) {
       throw new IllegalArgumentException("No schema for event type " + eventType);
     }
     Schema schema = REGISTRY.getSchema(SchemaLocation.of(ID_BASE + file));

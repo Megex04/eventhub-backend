@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.eventhub</groupId>
+    <artifactId>eventhub-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>contract-testing</artifactId>
+  <name>contract-testing</name>
+  <description>Test-only helpers: JSON Schema validation of events and OpenAPI conformance, read from contracts/</description>
+
+  <dependencies>
+    <!--
+      The parent manages this artifact with scope test; here it is a compile dependency of the library
+      so that consumers (which declare the library with scope test) receive it transitively. It brings
+      networknt json-schema-validator 2.x (Jackson 2), the documented test-only exception to Jackson 3.
+    -->
+    <dependency>
+      <groupId>com.atlassian.oai</groupId>
+      <artifactId>openapi-request-validator-mockmvc</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

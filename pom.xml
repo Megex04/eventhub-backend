@@ -18,6 +18,7 @@
   <description>EventHub monorepo parent: centralised versions and build conventions</description>
 
   <modules>
+    <module>libs/contract-testing</module>
     <module>services/catalog-service</module>
   </modules>
 
@@ -42,6 +43,12 @@
         <version>${spring-cloud.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.eventhub</groupId>
+        <artifactId>contract-testing</artifactId>
+        <version>${project.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.tngtech.archunit</groupId>
