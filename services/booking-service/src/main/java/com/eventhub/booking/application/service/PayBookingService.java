@@ -15,12 +15,9 @@ import com.eventhub.booking.application.port.out.TransactionRunner;
 import com.eventhub.booking.domain.Booking;
 import com.eventhub.booking.domain.Booking.CaptureOutcome;
 import com.eventhub.booking.domain.BookingStatus;
-import com.eventhub.booking.domain.DomainEvent;
 import com.eventhub.booking.domain.Payment;
 import com.eventhub.booking.domain.PaymentInProgressException;
-import com.eventhub.booking.domain.PaymentStatus;
 import java.time.Clock;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -42,10 +39,10 @@ public class PayBookingService implements PayBookingUseCase {
 
   private final TransactionRunner transactions;
   private final BookingRepository bookings;
-  private final DomainEventPublisher publisher;
   private final IdGenerator ids;
   private final PaymentGateway gateway;
   private final Clock clock;
+  private final PaymentOutcomes outcomes;
   private final RefundSettler refunds;
 
   public PayBookingService(
@@ -57,10 +54,10 @@ public class PayBookingService implements PayBookingUseCase {
       Clock clock) {
     this.transactions = transactions;
     this.bookings = bookings;
-    this.publisher = publisher;
     this.ids = ids;
     this.gateway = gateway;
     this.clock = clock;
+    this.outcomes = new PaymentOutcomes(transactions, bookings, publisher, clock);
     this.refunds = new RefundSettler(transactions, bookings, publisher, gateway, clock);
   }
 
@@ -71,10 +68,10 @@ public class PayBookingService implements PayBookingUseCase {
       return started.booking();
     }
     Payment payment = started.payment();
-    ChargeResult result = charge(payment);
-    return switch (result) {
-      case ChargeResult.Approved approved -> applyApproval(started.booking().id(), payment.id());
-      case ChargeResult.Declined declined -> applyDecline(started.booking().id());
+    UUID bookingId = started.booking().id();
+    return switch (charge(payment)) {
+      case ChargeResult.Approved approved -> applyApproval(bookingId, payment.id());
+      case ChargeResult.Declined declined -> applyDecline(bookingId, payment.id());
     };
   }
 
@@ -100,7 +97,7 @@ public class PayBookingService implements PayBookingUseCase {
 
   /** Step 3, approved: confirm if still payable, otherwise give the money back. */
   private Booking applyApproval(UUID bookingId, UUID paymentId) {
-    Captured captured = VersionRetry.run(transactions, () -> capture(bookingId, paymentId));
+    PaymentOutcomes.Captured captured = outcomes.capture(bookingId, paymentId);
     if (captured.outcome() == CaptureOutcome.CONFIRMED) {
       return captured.booking();
     }
@@ -108,43 +105,10 @@ public class PayBookingService implements PayBookingUseCase {
     throw new PaymentRefundedException();
   }
 
-  private Captured capture(UUID bookingId, UUID paymentId) {
-    Booking booking = bookings.findById(bookingId).orElseThrow();
-    if (resolvedMeanwhile(booking, paymentId)) {
-      return new Captured(booking, outcomeOf(booking));
-    }
-    CaptureOutcome outcome = booking.capturePayment(clock);
-    List<DomainEvent> events = booking.pullDomainEvents();
-    Booking saved = bookings.save(booking);
-    publisher.publish(events);
-    return new Captured(saved, outcome);
-  }
-
-  /** The reconciler may have settled this very payment while the answer was on its way. */
-  private static boolean resolvedMeanwhile(Booking booking, UUID paymentId) {
-    return booking
-        .payment()
-        .filter(payment -> payment.id().equals(paymentId))
-        .filter(payment -> payment.status() != PaymentStatus.INITIATED)
-        .isPresent();
-  }
-
-  private static CaptureOutcome outcomeOf(Booking booking) {
-    return booking.status() == BookingStatus.CONFIRMED
-        ? CaptureOutcome.CONFIRMED
-        : CaptureOutcome.REFUND_REQUIRED;
-  }
-
   /** Step 3, declined: the booking stays PENDING and can be paid again. */
-  private Booking applyDecline(UUID bookingId) {
-    VersionRetry.run(transactions, () -> decline(bookingId));
+  private Booking applyDecline(UUID bookingId, UUID paymentId) {
+    outcomes.decline(bookingId, paymentId);
     throw new PaymentDeclinedException();
-  }
-
-  private Booking decline(UUID bookingId) {
-    Booking booking = bookings.findById(bookingId).orElseThrow();
-    booking.declinePayment();
-    return bookings.save(booking);
   }
 
   private record Started(Booking booking, Payment payment) {
@@ -153,6 +117,4 @@ public class PayBookingService implements PayBookingUseCase {
       return payment == null;
     }
   }
-
-  private record Captured(Booking booking, CaptureOutcome outcome) {}
 }
