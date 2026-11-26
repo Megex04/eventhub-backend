@@ -12,4 +12,8 @@ public final class ConcurrencyConflictException extends RuntimeException {
   public ConcurrencyConflictException(UUID bookingId) {
     super("Booking %s was modified concurrently".formatted(bookingId));
   }
+
+  public ConcurrencyConflictException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

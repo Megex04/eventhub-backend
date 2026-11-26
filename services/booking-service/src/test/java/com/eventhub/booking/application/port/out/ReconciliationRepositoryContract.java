@@ -75,7 +75,8 @@ public abstract class ReconciliationRepositoryContract {
 
     reconciliation().recordFailure(uuid(701), "gateway down", retryAt);
 
-    assertThat(reconciliation().findRefundsDue(retryAt.minusNanos(1), 10)).isEmpty();
+    assertThat(reconciliation().findRefundsDue(retryAt.minus(Duration.ofNanos(1_000)), 10))
+        .isEmpty();
     assertThat(reconciliation().findRefundsDue(retryAt, 10)).containsExactly(uuid(1));
   }
 

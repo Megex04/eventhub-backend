@@ -30,6 +30,10 @@ public final class SharedPostgres
             "spring.datasource.url=" + POSTGRES.getJdbcUrl(),
             "spring.datasource.username=" + POSTGRES.getUsername(),
             "spring.datasource.password=" + POSTGRES.getPassword(),
+            // The stress tests run hundreds of threads against one pool: let them queue for a
+            // connection instead of failing.
+            "spring.datasource.hikari.maximum-pool-size=40",
+            "spring.datasource.hikari.connection-timeout=60000",
             // Required by the resource server config; tests replace the decoder, so it is never
             // called.
             "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://keycloak.test/realms/eventhub")

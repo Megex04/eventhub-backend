@@ -9,7 +9,7 @@ import java.time.ZoneOffset;
 /** A clock the test moves by hand, so time-dependent rules are exercised without waiting. */
 public final class MutableClock extends Clock {
 
-  private Instant now;
+  private volatile Instant now;
 
   public MutableClock(Instant start) {
     this.now = start;
@@ -19,7 +19,7 @@ public final class MutableClock extends Clock {
     this.now = instant;
   }
 
-  public void advance(Duration duration) {
+  public synchronized void advance(Duration duration) {
     this.now = now.plus(duration);
   }
 

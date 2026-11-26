@@ -11,6 +11,7 @@ import com.eventhub.booking.domain.BookingStatus;
 import com.eventhub.booking.domain.CancelReason;
 import com.eventhub.booking.domain.PaymentStatus;
 import com.eventhub.booking.domain.RequestedItem;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +28,9 @@ import org.junit.jupiter.api.Test;
  * and against JPA/PostgreSQL later: the same behaviour, one suite.
  */
 public abstract class BookingRepositoryContract {
+
+  /** The smallest step the database tells apart: PostgreSQL keeps microseconds. */
+  private static final Duration ONE_TICK = Duration.ofNanos(1_000);
 
   protected abstract BookingRepository repository();
 
@@ -244,7 +248,7 @@ public abstract class BookingRepositoryContract {
         .extracting(Booking::id)
         .containsExactly(uuid(1), uuid(2));
     assertThat(repository().findExpirable(now, 1)).extracting(Booking::id).containsExactly(uuid(1));
-    assertThat(repository().findExpirable(NOW.plus(HOLD).minusNanos(1), 10)).isEmpty();
+    assertThat(repository().findExpirable(NOW.plus(HOLD).minus(ONE_TICK), 10)).isEmpty();
   }
 
   @Test
