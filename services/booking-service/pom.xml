@@ -127,12 +127,42 @@
         layer (target 80 %) is only reported. Generated code and the main class are not measured.
         prepare-agent covers unit tests (surefire) and integration tests (failsafe) in one report.
       -->
+      <!--
+        Two surefire executions, each with its own JaCoCo agent file: the tests of the domain package
+        run alone (jacoco-domain.exec) and every other unit test runs apart (jacoco-ut.exec). The
+        domain gate reads only the first one, so the domain has to be covered by ITS OWN tests; tests
+        of other layers that happen to walk through domain code do not count towards it.
+      -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <argLine>@{surefireArgLine}</argLine>
-        </configuration>
+        <executions>
+          <execution>
+            <id>default-test</id>
+            <configuration>
+              <argLine>@{surefireArgLine}</argLine>
+              <excludes>
+                <exclude>**/domain/**</exclude>
+                <exclude>**/*$*</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <id>domain-tests</id>
+            <phase>test</phase>
+            <goals>
+              <goal>test</goal>
+            </goals>
+            <configuration>
+              <argLine>@{domainArgLine}</argLine>
+              <!-- Without domain tests there is no jacoco-domain.exec and JaCoCo would skip the gate. -->
+              <failIfNoTests>true</failIfNoTests>
+              <includes>
+                <include>**/domain/*Test.java</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -157,6 +187,17 @@
             its own file and append=false: a stale file from an earlier run cannot inflate the gate,
             and one JVM cannot overwrite the other's data. They are merged before report and checks.
           -->
+          <execution>
+            <id>agent-domain</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco-domain.exec</destFile>
+              <propertyName>domainArgLine</propertyName>
+              <append>false</append>
+            </configuration>
+          </execution>
           <execution>
             <id>agent-ut</id>
             <goals>
@@ -190,6 +231,7 @@
                 <fileSet>
                   <directory>${project.build.directory}</directory>
                   <includes>
+                    <include>jacoco-domain.exec</include>
                     <include>jacoco-ut.exec</include>
                     <include>jacoco-it.exec</include>
                   </includes>
@@ -212,6 +254,8 @@
               <goal>check</goal>
             </goals>
             <configuration>
+              <!-- Only what the domain's own tests executed. -->
+              <dataFile>${project.build.directory}/jacoco-domain.exec</dataFile>
               <rules>
                 <rule>
                   <element>PACKAGE</element>
