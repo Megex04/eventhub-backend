@@ -22,7 +22,12 @@ import org.springframework.test.context.ContextConfiguration;
 @SpringBootTest
 @ActiveProfiles("test")
 @ContextConfiguration(
-    initializers = {SharedPostgres.class, SharedRabbit.class, TestOutboxSettings.class})
+    initializers = {
+      SharedPostgres.class,
+      SharedRabbit.class,
+      TestOutboxSettings.class,
+      TestConsumerSettings.class
+    })
 @Import(TestSupportConfig.class)
 @ExtendWith(CleanDatabaseExtension.class)
 public @interface PersistenceIT {}

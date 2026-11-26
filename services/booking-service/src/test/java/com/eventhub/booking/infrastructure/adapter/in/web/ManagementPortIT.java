@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.eventhub.booking.support.SharedPostgres;
 import com.eventhub.booking.support.SharedRabbit;
+import com.eventhub.booking.support.TestConsumerSettings;
 import com.eventhub.booking.support.TestOutboxSettings;
 import com.eventhub.booking.support.TestSupportConfig;
 import com.eventhub.booking.support.TestTokens;
@@ -31,7 +32,12 @@ import org.springframework.test.context.ContextConfiguration;
 @AutoConfigureMetrics
 @ActiveProfiles("test")
 @ContextConfiguration(
-    initializers = {SharedPostgres.class, SharedRabbit.class, TestOutboxSettings.class})
+    initializers = {
+      SharedPostgres.class,
+      SharedRabbit.class,
+      TestOutboxSettings.class,
+      TestConsumerSettings.class
+    })
 @Import(TestSupportConfig.class)
 class ManagementPortIT {
 
