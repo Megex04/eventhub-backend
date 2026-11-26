@@ -21,7 +21,7 @@ public final class TestConsumerSettings
     String consumer = "spring.cloud.stream.bindings." + BINDING + ".consumer.";
     TestPropertyValues.of(
             consumer + "auto-startup=false",
-            consumer + "max-attempts=4",
+            consumer + "max-attempts=5",
             consumer + "back-off-initial-interval=200",
             consumer + "back-off-multiplier=2.0",
             consumer + "back-off-max-interval=800")

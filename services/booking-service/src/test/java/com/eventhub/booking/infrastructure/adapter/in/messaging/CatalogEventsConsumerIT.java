@@ -604,10 +604,14 @@ class CatalogEventsConsumerIT extends ApiIT {
     assertThat(dead.getMessageProperties().getHeaders()).containsKey("x-exception-message");
     assertThat(failed("EventRescheduled") - failedBefore)
         .as("every attempt failed: the configured number of tries")
-        .isEqualTo(4.0);
+        .isEqualTo(5.0);
     eventually(() -> deadLettered() - deadBefore == 1.0);
     assertThat(wasProcessed(orphan)).as("a failed message is not marked as processed").isFalse();
     assertThat(projectionStatus(event)).isEmpty();
+
+    UUID next = uuid(3219);
+    publish(next, T1);
+    eventually(() -> projectionStatus(next).isPresent());
 
     // Catalog's re-emission carries the current state (the new dates) and repairs what was lost.
     send(

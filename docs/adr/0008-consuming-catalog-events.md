@@ -49,7 +49,9 @@ no se invocaba y, de rechazar el mensaje, lo sacaría del camino de DLQ del bind
 ## Consecuencias
 
 - La DLQ requiere operación humana (inspeccionar, reemitir desde catalog); no hay reproceso automático.
-- Un mensaje que falla de forma transitoria retiene la cola hasta 1+2+4+8 s (15 s): aceptable con un solo
-  consumidor y volumen bajo.
+- Un mensaje que falla de forma transitoria retiene la cola hasta 1+2+4+8 s (15 s, 5 intentos): aceptable con un solo
+  consumidor y volumen bajo. Es configurable en `spring.cloud.stream.bindings.catalogEvents-in-0.consumer.`
+  (`max-attempts`, `back-off-initial-interval`, `back-off-multiplier`, `back-off-max-interval`); el techo es la
+  suma de las esperas y conviene mantenerlo por debajo de ~60 s.
 - Los tests desactivan el binding al arrancar (`TestConsumerSettings`) y solo `CatalogEventsConsumerIT`
   lo arranca, para que un contexto en caché no compita por la cola.
