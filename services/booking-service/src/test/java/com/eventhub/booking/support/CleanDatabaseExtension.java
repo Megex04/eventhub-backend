@@ -21,6 +21,9 @@ public final class CleanDatabaseExtension implements BeforeEachCallback {
     spring.getBean(MutableClock.class).set(NOW);
     spring.getBeanProvider(FakePaymentGateway.class).ifAvailable(FakePaymentGateway::reset);
     spring
+        .getBeanProvider(ControllableOutboxBroker.class)
+        .ifAvailable(ControllableOutboxBroker::reset);
+    spring
         .getBean(JdbcTemplate.class)
         .execute(
             "TRUNCATE TABLE payment, booking_item, booking, zone_inventory, projected_zone,"

@@ -3,6 +3,8 @@ package com.eventhub.booking.infrastructure.adapter.in.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.eventhub.booking.support.SharedPostgres;
+import com.eventhub.booking.support.SharedRabbit;
+import com.eventhub.booking.support.TestOutboxSettings;
 import com.eventhub.booking.support.TestSupportConfig;
 import com.eventhub.booking.support.TestTokens;
 import java.net.URI;
@@ -28,7 +30,8 @@ import org.springframework.test.context.ContextConfiguration;
     properties = {"management.server.port=0"})
 @AutoConfigureMetrics
 @ActiveProfiles("test")
-@ContextConfiguration(initializers = SharedPostgres.class)
+@ContextConfiguration(
+    initializers = {SharedPostgres.class, SharedRabbit.class, TestOutboxSettings.class})
 @Import(TestSupportConfig.class)
 class ManagementPortIT {
 

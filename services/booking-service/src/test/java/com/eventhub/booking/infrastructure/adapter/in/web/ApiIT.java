@@ -30,11 +30,11 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @PersistenceIT
 @AutoConfigureMockMvc
-abstract class ApiIT {
+public abstract class ApiIT {
 
-  static final String BOOKINGS = "/api/v1/bookings";
-  static final String PROBLEM = "application/problem+json";
-  static final String TYPE_BASE = "https://eventhub.dev/problems/";
+  public static final String BOOKINGS = "/api/v1/bookings";
+  public static final String PROBLEM = "application/problem+json";
+  public static final String TYPE_BASE = "https://eventhub.dev/problems/";
 
   @Autowired protected MockMvc mvc;
   @Autowired protected ApplicationContext context;
@@ -47,7 +47,7 @@ abstract class ApiIT {
   protected final String bob = TestTokens.forUser(OTHER_USER);
 
   @BeforeEach
-  void openTheEvent() {
+  protected void openTheEvent() {
     app = new RealApp(context);
     app.openEvent(20, 100);
   }

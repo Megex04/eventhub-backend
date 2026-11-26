@@ -9,6 +9,7 @@ import static com.eventhub.booking.application.AppFixtures.VIP;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.eventhub.booking.application.port.out.BookingRepository;
+import com.eventhub.booking.application.port.out.DomainEventPublisher;
 import com.eventhub.booking.application.port.out.EventProjectionRepository;
 import com.eventhub.booking.application.port.out.IdGenerator;
 import com.eventhub.booking.application.port.out.InventoryRepository;
@@ -40,10 +41,11 @@ public final class RealApp {
   public final IdGenerator ids;
   public final MutableClock clock;
   public final JdbcTemplate jdbc;
-  public final CollectingPublisher publisher = new CollectingPublisher();
+  public final DomainEventPublisher publisher;
 
   public RealApp(ApplicationContext context) {
     this.tx = context.getBean(TransactionRunner.class);
+    this.publisher = context.getBean(DomainEventPublisher.class);
     this.bookings = context.getBean(BookingRepository.class);
     this.inventory = context.getBean(InventoryRepository.class);
     this.projections = context.getBean(EventProjectionRepository.class);

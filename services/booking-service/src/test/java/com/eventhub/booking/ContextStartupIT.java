@@ -3,6 +3,7 @@ package com.eventhub.booking;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.eventhub.booking.support.SharedPostgres;
+import com.eventhub.booking.support.SharedRabbit;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class ContextStartupIT {
     }
     new SpringApplicationBuilder(BookingServiceApplication.class)
         .web(WebApplicationType.SERVLET)
-        .initializers(new SharedPostgres())
+        .initializers(new SharedPostgres(), new SharedRabbit())
         .run(args.toArray(String[]::new))
         .close();
   }

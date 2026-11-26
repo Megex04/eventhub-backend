@@ -21,7 +21,8 @@ import org.springframework.test.context.ContextConfiguration;
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
 @ActiveProfiles("test")
-@ContextConfiguration(initializers = SharedPostgres.class)
+@ContextConfiguration(
+    initializers = {SharedPostgres.class, SharedRabbit.class, TestOutboxSettings.class})
 @Import(TestSupportConfig.class)
 @ExtendWith(CleanDatabaseExtension.class)
 public @interface PersistenceIT {}

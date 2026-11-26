@@ -3,8 +3,10 @@ package com.eventhub.booking.support;
 import static com.eventhub.booking.application.AppFixtures.NOW;
 
 import com.eventhub.booking.application.port.out.FakePaymentGateway;
+import com.eventhub.booking.infrastructure.adapter.out.messaging.OutboxBroker;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -35,6 +37,16 @@ public class TestSupportConfig {
   @Primary
   MutableClock testClock() {
     return new MutableClock(NOW);
+  }
+
+  /**
+   * Primary {@code OutboxBroker}: the real one, with switches to make chosen sends fail or wait.
+   */
+  @Bean
+  @Primary
+  ControllableOutboxBroker controllableOutboxBroker(
+      @Qualifier("streamBridgeOutboxBroker") OutboxBroker real) {
+    return new ControllableOutboxBroker(real);
   }
 
   /** Wins over the simulated gateway of the test profile: the tests drive this one. */

@@ -12,6 +12,30 @@ spring:
   jackson:
     # Optional fields (confirmedAt, cancelReason, payment) are absent rather than null.
     default-property-inclusion: non_null
+  # Broker connection comes from the environment; credentials have no default on purpose.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASSWORD}
+    # The relay marks a row published only after the broker confirmed it.
+    publisher-confirm-type: correlated
+    # An unresponsive broker must fail an attempt, not hang the relay while it holds row locks.
+    connection-timeout: 5s
+    channel-rpc-timeout: 5s
+  cloud:
+    stream:
+      bindings:
+        outbox-out-0:
+          destination: eventhub.events
+      rabbit:
+        bindings:
+          outbox-out-0:
+            producer:
+              exchange-type: topic
+              # <service>.<aggregate>.<event>.v<version>, set per message by the relay.
+              routing-key-expression: headers['routingKey']
+              use-confirm-header: true
   security:
     oauth2:
       resourceserver:
@@ -33,6 +57,15 @@ server:
 
 # Tunables of the service (see BookingProperties). Validated at startup: a bad value stops it.
 eventhub:
+  # Outbox relay (see OutboxProperties). The poller can be switched off with enabled: false.
+  outbox:
+    enabled: true
+    batch-size: 50
+    poll-interval: 1s
+    max-attempts: 10
+    initial-backoff: 2s
+    max-backoff: 5m
+    confirm-timeout: 5s
   booking:
     hold-duration: 10m
     max-tickets: 6

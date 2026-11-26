@@ -10,7 +10,6 @@ import com.eventhub.booking.application.port.out.FakePaymentGateway;
 import com.eventhub.booking.application.service.CancelBookingService;
 import com.eventhub.booking.application.service.CreateBookingService;
 import com.eventhub.booking.application.service.ExpireBookingsService;
-import com.eventhub.booking.domain.BookingExpired;
 import com.eventhub.booking.domain.InsufficientInventoryException;
 import com.eventhub.booking.domain.InvalidStateException;
 import com.eventhub.booking.domain.RequestedItem;
@@ -221,7 +220,8 @@ class InventoryConcurrencyIT {
     assertThat(outcomes).allSatisfy(o -> assertThat(o.failure()).isNull());
     int total = outcomes.stream().mapToInt(Outcome::value).sum() + rest;
     assertThat(total).isEqualTo(20);
-    assertThat(app.publisher.count(BookingExpired.class)).isEqualTo(20);
+    assertThat(app.count("SELECT count(*) FROM outbox_event WHERE event_type = 'BookingExpired'"))
+        .isEqualTo(20);
     assertThat(app.count("SELECT count(*) FROM booking WHERE status = 'EXPIRED'")).isEqualTo(20);
     assertThat(app.reserved(VIP_ZONE)).isZero();
     app.assertInventoryInvariant();
