@@ -24,10 +24,26 @@ spring:
     connection-timeout: 5s
     channel-rpc-timeout: 5s
   cloud:
+    function:
+      definition: catalogEvents
     stream:
       bindings:
         outbox-out-0:
           destination: eventhub.events
+        # The one consumer of the catalog events (ADR 0008): one queue, three routing keys.
+        catalogEvents-in-0:
+          destination: eventhub.events
+          group: booking-catalog-events
+          consumer:
+            concurrency: 1
+            # Retries happen in process, with backoff; when they run out the message is republished
+            # to the dead-letter queue. A poison message is not retried: it can never succeed.
+            max-attempts: 5
+            back-off-initial-interval: 1000
+            back-off-multiplier: 2.0
+            back-off-max-interval: 30000
+            retryable-exceptions:
+              com.eventhub.booking.infrastructure.adapter.in.messaging.PoisonMessageException: false
       rabbit:
         bindings:
           outbox-out-0:
@@ -36,6 +52,19 @@ spring:
               # <service>.<aggregate>.<event>.v<version>, set per message by the relay.
               routing-key-expression: headers['routingKey']
               use-confirm-header: true
+          catalogEvents-in-0:
+            consumer:
+              exchange-type: topic
+              # The queue is named after the group alone: booking-catalog-events (and its .dlq).
+              queue-name-group-only: true
+              binding-routing-key: catalog.event.published.v1,catalog.event.rescheduled.v1,catalog.event.cancelled.v1
+              binding-routing-key-delimiter: ","
+              auto-bind-dlq: true
+              dead-letter-queue-name: booking-catalog-events.dlq
+              republish-to-dlq: true
+              requeue-rejected: false
+              # One message at a time keeps the order of what catalog sent.
+              prefetch: 1
   security:
     oauth2:
       resourceserver:
@@ -79,7 +108,7 @@ eventhub:
       batch-size: 20
       poll-interval: 1m
     cascade:
-      batch-size: 50
+      batch-size: 100
 
 management:
   server:
