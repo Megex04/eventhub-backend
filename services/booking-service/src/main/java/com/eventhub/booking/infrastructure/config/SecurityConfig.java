@@ -9,15 +9,17 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Stateless OAuth2 Resource Server. Any authenticated user may book (no special role); only the
- * reads the OpenAPI marks with {@code security: []} are public. Ownership of a booking is a
- * business rule enforced by the use cases, not here.
+ * Stateless OAuth2 Resource Server. Any authenticated user may book (no special role); only what
+ * the OpenAPI marks with {@code security: []} (the availability of an event) and the liveness and
+ * readiness probes are public. Everything else, {@code /actuator/prometheus} included, needs a
+ * valid JWT. Whose booking it is, is a business rule enforced by the use cases, not here.
  */
 @Configuration
 class SecurityConfig {
 
   @Bean
-  SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) throws Exception {
+  SecurityFilterChain apiSecurityFilterChain(HttpSecurity http, ProblemSecurityHandlers problems)
+      throws Exception {
     return http
         // Bearer tokens are not ambient credentials, so there is no cookie session to forge
         // requests on.
@@ -32,7 +34,13 @@ class SecurityConfig {
                 .permitAll()
                 .anyRequest()
                 .authenticated())
-        .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> {}))
+        .exceptionHandling(
+            handling -> handling.authenticationEntryPoint(problems).accessDeniedHandler(problems))
+        .oauth2ResourceServer(resourceServer ->
+            resourceServer
+                .authenticationEntryPoint(problems)
+                .accessDeniedHandler(problems)
+                .jwt(jwt -> {}))
         .build();
   }
 }
