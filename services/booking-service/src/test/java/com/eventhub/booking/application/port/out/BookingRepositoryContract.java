@@ -86,7 +86,7 @@ public abstract class BookingRepositoryContract {
     stale.expire(at(NOW.plus(HOLD)));
 
     assertThatThrownBy(() -> repository().save(stale))
-        .isInstanceOf(BookingVersionConflictException.class);
+        .isInstanceOf(ConcurrencyConflictException.class);
     assertThat(repository().findById(uuid(1)).orElseThrow().status())
         .isEqualTo(BookingStatus.CANCELLED);
   }
@@ -111,7 +111,7 @@ public abstract class BookingRepositoryContract {
                     try {
                       repository().save(booking);
                       won.incrementAndGet();
-                    } catch (BookingVersionConflictException e) {
+                    } catch (ConcurrencyConflictException e) {
                       conflicts.incrementAndGet();
                     }
                     return null;
@@ -146,7 +146,7 @@ public abstract class BookingRepositoryContract {
         .hasValueSatisfying(payment -> {
           assertThat(payment.id()).isEqualTo(uuid(700));
           assertThat(payment.status()).isEqualTo(PaymentStatus.CAPTURED);
-          assertThat(payment.paymentToken()).isEqualTo("tok_approved");
+          assertThat(payment.paymentToken()).as("erased once captured").isEmpty();
           assertThat(payment.amount()).isEqualTo(found.total());
         });
   }

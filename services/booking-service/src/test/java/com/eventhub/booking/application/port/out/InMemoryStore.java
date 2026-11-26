@@ -83,7 +83,12 @@ public final class InMemoryStore {
 
   static EventProjection copy(EventProjection p) {
     return EventProjection.restore(
-        p.eventId(), p.status(), p.startsAt(), p.endsAt(), p.zones(), p.lastOccurredAt());
+        p.eventId(),
+        p.status(),
+        p.startsAt().orElse(null),
+        p.endsAt().orElse(null),
+        p.zones(),
+        p.lastOccurredAt());
   }
 
   static ZoneInventory copy(ZoneInventory z) {

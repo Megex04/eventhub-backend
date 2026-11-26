@@ -9,7 +9,7 @@ import com.eventhub.booking.application.exception.PaymentDeclinedException;
 import com.eventhub.booking.application.exception.PaymentRefundedException;
 import com.eventhub.booking.application.port.in.PayBookingCommand;
 import com.eventhub.booking.application.port.out.BookingRepository;
-import com.eventhub.booking.application.port.out.BookingVersionConflictException;
+import com.eventhub.booking.application.port.out.ConcurrencyConflictException;
 import com.eventhub.booking.application.port.out.FakePaymentGateway.Gate;
 import com.eventhub.booking.application.port.out.IdempotencyRecord;
 import com.eventhub.booking.application.port.out.StoredBooking;
@@ -396,7 +396,7 @@ class PayBookingServiceTest {
     public Booking save(Booking booking) {
       saves++;
       if (saves == 2) {
-        throw new BookingVersionConflictException(booking.id());
+        throw new ConcurrencyConflictException(booking.id());
       }
       return delegate.save(booking);
     }

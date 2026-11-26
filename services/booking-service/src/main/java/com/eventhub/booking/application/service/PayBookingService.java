@@ -89,7 +89,7 @@ public class PayBookingService implements PayBookingUseCase {
   private ChargeResult charge(Payment payment) {
     try {
       return gateway.charge(
-          new ChargeRequest(payment.id(), payment.amount(), payment.paymentToken()));
+          new ChargeRequest(payment.id(), payment.amount(), payment.paymentToken().orElseThrow()));
     } catch (PaymentGatewayException unknownOutcome) {
       throw new PaymentInProgressException(payment.id());
     }

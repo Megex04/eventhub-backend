@@ -46,7 +46,7 @@ public final class InMemoryBookingRepository implements BookingRepository {
         throw new IllegalStateException("Booking " + booking.id() + " does not exist");
       }
       if (current.version() != booking.version()) {
-        throw new BookingVersionConflictException(booking.id());
+        throw new ConcurrencyConflictException(booking.id());
       }
       Booking next = InMemoryStore.copy(booking, current.version() + 1);
       store.bookings.put(next.id(), next);

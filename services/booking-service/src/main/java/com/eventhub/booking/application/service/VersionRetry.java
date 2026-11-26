@@ -1,6 +1,6 @@
 package com.eventhub.booking.application.service;
 
-import com.eventhub.booking.application.port.out.BookingVersionConflictException;
+import com.eventhub.booking.application.port.out.ConcurrencyConflictException;
 import com.eventhub.booking.application.port.out.TransactionRunner;
 import java.util.function.Supplier;
 
@@ -19,7 +19,7 @@ final class VersionRetry {
     for (int attempt = 1; ; attempt++) {
       try {
         return transactions.execute(work);
-      } catch (BookingVersionConflictException conflict) {
+      } catch (ConcurrencyConflictException conflict) {
         if (attempt == MAX_ATTEMPTS) {
           throw conflict;
         }

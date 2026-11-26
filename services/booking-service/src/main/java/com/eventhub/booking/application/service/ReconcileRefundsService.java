@@ -101,7 +101,9 @@ public class ReconcileRefundsService implements ReconcileRefundsUseCase {
     ChargeResult result;
     try {
       result =
-          gateway.charge(new ChargeRequest(payment.id(), payment.amount(), payment.paymentToken()));
+          gateway.charge(
+              new ChargeRequest(
+                  payment.id(), payment.amount(), payment.paymentToken().orElseThrow()));
     } catch (PaymentGatewayException unknownAgain) {
       tally.orphansUnresolved++;
       backOff(payment.id(), "charge outcome still unknown");

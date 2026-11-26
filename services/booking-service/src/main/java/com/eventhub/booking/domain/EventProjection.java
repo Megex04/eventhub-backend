@@ -69,16 +69,18 @@ public final class EventProjection {
         eventId, EventSaleStatus.CANCELLED, null, null, List.of(), occurredAt);
   }
 
-  /** Rebuilds the projection from persisted state without re-validating. */
+  /**
+   * Rebuilds the projection from persisted state without re-validating. {@code startsAt} and {@code
+   * endsAt} are null only for a tombstone.
+   */
   public static EventProjection restore(
       UUID eventId,
       EventSaleStatus status,
-      Optional<Instant> startsAt,
-      Optional<Instant> endsAt,
+      Instant startsAt,
+      Instant endsAt,
       List<ProjectedZone> zones,
       Instant lastOccurredAt) {
-    return new EventProjection(
-        eventId, status, startsAt.orElse(null), endsAt.orElse(null), zones, lastOccurredAt);
+    return new EventProjection(eventId, status, startsAt, endsAt, zones, lastOccurredAt);
   }
 
   /** Also the entry point of a replay: it refreshes the data of an event that is still open. */

@@ -73,7 +73,7 @@ class PaymentTest {
     assertThat(payment.status()).isEqualTo(PaymentStatus.INITIATED);
     assertThat(payment.id()).isEqualTo(ID);
     assertThat(payment.amount()).isEqualTo(AMOUNT);
-    assertThat(payment.paymentToken()).isEqualTo(TOKEN);
+    assertThat(payment.paymentToken()).contains(TOKEN);
     assertThat(payment.refundReason()).isEmpty();
   }
 
@@ -99,6 +99,33 @@ class PaymentTest {
     assertThat(pending.refundReason()).contains(RefundReason.EVENT_CANCELLED);
     assertThat(pending.amount()).isEqualTo(AMOUNT);
     assertThat(pending.completeRefund().refundReason()).contains(RefundReason.EVENT_CANCELLED);
+  }
+
+  @Test
+  void should_erase_the_token_when_the_charge_is_captured() {
+    assertThat(Payment.initiate(ID, AMOUNT, TOKEN).capture().paymentToken()).isEmpty();
+  }
+
+  @Test
+  void should_erase_the_token_when_the_charge_is_declined() {
+    assertThat(Payment.initiate(ID, AMOUNT, TOKEN).decline().paymentToken()).isEmpty();
+  }
+
+  @Test
+  void should_keep_the_token_while_the_payment_is_initiated() {
+    assertThat(Payment.initiate(ID, AMOUNT, TOKEN).paymentToken()).contains(TOKEN);
+  }
+
+  @Test
+  void should_never_have_a_token_once_the_money_is_refunded() {
+    Payment refunded =
+        Payment.initiate(ID, AMOUNT, TOKEN)
+            .capture()
+            .requestRefund(RefundReason.BOOKING_CANCELLED)
+            .completeRefund();
+
+    assertThat(refunded.paymentToken()).isEmpty();
+    assertThat(refunded.toString()).doesNotContain(TOKEN);
   }
 
   @Test

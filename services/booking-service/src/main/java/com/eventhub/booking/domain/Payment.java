@@ -10,8 +10,10 @@ import java.util.UUID;
  * booking's total by construction.
  *
  * <p>{@code id} is the idempotency key the payment gateway receives for both charge and refund.
- * {@code paymentToken} is the opaque {@code tok_...} the customer sent (never card data); it is
- * kept so a charge whose outcome is unknown can be repeated by the reconciler.
+ * {@code paymentToken} is the opaque {@code tok_...} the customer sent (never card data). It is
+ * kept only while the payment is INITIATED, so that a charge whose outcome is unknown can be
+ * repeated by the reconciler, and it is erased by the transition that ends that need: nothing is
+ * charged again afterwards. It must never be logged.
  */
 public final class Payment {
 
@@ -39,7 +41,7 @@ public final class Payment {
         null);
   }
 
-  /** Rebuilds a payment from persisted state without re-validating. */
+  /** Rebuilds a payment from persisted state; {@code paymentToken} is null once erased. */
   public static Payment restore(
       UUID id,
       PaymentStatus status,
@@ -88,8 +90,9 @@ public final class Payment {
     return amount;
   }
 
-  public String paymentToken() {
-    return paymentToken;
+  /** Present only while the payment is INITIATED. */
+  public Optional<String> paymentToken() {
+    return Optional.ofNullable(paymentToken);
   }
 
   public Optional<RefundReason> refundReason() {
@@ -97,7 +100,8 @@ public final class Payment {
   }
 
   private Payment next(PaymentStatus nextStatus, RefundReason reason) {
-    return new Payment(id, nextStatus, amount, paymentToken, reason);
+    // Every next status is one in which the token is no longer needed.
+    return new Payment(id, nextStatus, amount, null, reason);
   }
 
   private void requireStatus(PaymentStatus expected, String action) {

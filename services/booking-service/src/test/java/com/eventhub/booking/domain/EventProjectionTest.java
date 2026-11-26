@@ -9,7 +9,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -212,12 +211,7 @@ class EventProjectionTest {
   void should_rebuild_the_exact_state_when_restored() {
     EventProjection restored =
         EventProjection.restore(
-            EVENT,
-            EventSaleStatus.CANCELLED,
-            Optional.of(STARTS),
-            Optional.of(ENDS),
-            List.of(VIP),
-            T0.plusSeconds(9));
+            EVENT, EventSaleStatus.CANCELLED, STARTS, ENDS, List.of(VIP), T0.plusSeconds(9));
 
     assertThat(restored.status()).isEqualTo(EventSaleStatus.CANCELLED);
     assertThat(restored.lastOccurredAt()).isEqualTo(T0.plusSeconds(9));

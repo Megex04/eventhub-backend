@@ -11,8 +11,8 @@ import java.util.UUID;
 
 /**
  * Persistence of the Booking aggregate. Every save of an existing booking raises its version by
- * exactly one and fails with {@link BookingVersionConflictException} when the aggregate is stale;
- * the saved aggregate is returned and is the one to use from then on.
+ * exactly one and fails with {@link ConcurrencyConflictException} when the aggregate is stale; the
+ * saved aggregate is returned and is the one to use from then on.
  */
 public interface BookingRepository {
 
