@@ -113,6 +113,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BookingDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -165,6 +166,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BookingDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -187,6 +189,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EventAvailability' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
 components:

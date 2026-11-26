@@ -12,7 +12,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -172,16 +171,9 @@ class OpenApiConformanceIT extends ApiIT {
     conforms(availability(uuid(999)), 404);
   }
 
-  /**
-   * GAP IN THE CONTRACT, awaiting a decision: a malformed id in the path is answered 400 (the
-   * framework cannot bind it), but {@code getBooking}, {@code cancelBooking} and {@code
-   * getEventAvailability} do not declare 400. CLAUDE.md asks the OpenAPI to declare every status
-   * the service returns, and contracts/ is not changed without approval. Enable this test once the
-   * three operations declare 400.
-   */
+  // ---- malformed id in the path: 400 on getBooking, cancelBooking and getEventAvailability ----
+
   @Test
-  @Disabled(
-      "contract gap: 400 is not declared for getBooking, cancelBooking and getEventAvailability")
   void should_conform_when_an_id_in_the_path_is_malformed() throws Exception {
     conforms(
         mvc.perform(
