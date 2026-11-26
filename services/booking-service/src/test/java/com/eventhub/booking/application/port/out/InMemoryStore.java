@@ -58,6 +58,11 @@ public final class InMemoryStore {
     this.clock = clock;
   }
 
+  /** True while the calling thread is inside a transaction (used to prove calls happen outside). */
+  public boolean inTransaction() {
+    return lock.isHeldByCurrentThread();
+  }
+
   static Booking copy(Booking b, long version) {
     return Booking.restore(
         b.id(),

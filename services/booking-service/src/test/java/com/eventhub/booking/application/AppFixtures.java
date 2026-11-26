@@ -25,6 +25,7 @@ public final class AppFixtures {
   public static final Instant NOW = Instant.parse("2026-12-01T10:00:00Z");
   public static final Instant EVENT_STARTS = Instant.parse("2027-01-10T20:00:00Z");
   public static final Duration HOLD = Duration.ofMinutes(10);
+  public static final Instant EXPIRES_AT = NOW.plus(HOLD);
   public static final BookingPolicy POLICY = new BookingPolicy(HOLD, 6);
 
   public static final ProjectedZone VIP =

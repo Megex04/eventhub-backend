@@ -119,6 +119,15 @@ public final class InMemoryBookingRepository implements BookingRepository {
             .toList());
   }
 
+  /** Test helper: the booking whose current payment has this id. */
+  public Optional<Booking> findByPaymentId(UUID paymentId) {
+    return store.transaction(() ->
+        store.bookings.values().stream()
+            .filter(b -> b.payment().map(p -> p.id().equals(paymentId)).orElse(false))
+            .findFirst()
+            .map(b -> InMemoryStore.copy(b, b.version())));
+  }
+
   private static Stream<Booking> oldestFirst(Stream<Booking> bookings) {
     return bookings.sorted(Comparator.comparing(Booking::createdAt).thenComparing(Booking::id));
   }
