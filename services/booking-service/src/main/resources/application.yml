@@ -103,7 +103,8 @@ eventhub:
       batch-size: 50
       poll-interval: 30s
     reconciler:
-      initiated-stale-after: 5m
+      enabled: true
+      initiated-stale-after: 2m
       initial-backoff: 30s
       max-backoff: 10m
       batch-size: 20

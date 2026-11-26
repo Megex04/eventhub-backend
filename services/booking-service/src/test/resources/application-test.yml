@@ -9,3 +9,5 @@ eventhub:
   booking:
     expiration:
       enabled: false
+    reconciler:
+      enabled: false

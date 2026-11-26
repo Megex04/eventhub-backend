@@ -34,6 +34,7 @@ public record BookingProperties(
 
   /** The job that finishes pending refunds and charges left initiated. */
   public record Reconciler(
+      boolean enabled,
       @NotNull @DurationMin(nanos = 0) Duration initiatedStaleAfter,
       @NotNull @DurationMin(nanos = 1) Duration initialBackoff,
       @NotNull @DurationMin(nanos = 1) Duration maxBackoff,
