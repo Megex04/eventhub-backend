@@ -1,0 +1,12 @@
+diff --git a/services/booking-service/src/main/java/com/eventhub/booking/application/service/ExpireBookingsService.java b/services/booking-service/src/main/java/com/eventhub/booking/application/service/ExpireBookingsService.java
+index f7b6814..049842c 100644
+--- a/services/booking-service/src/main/java/com/eventhub/booking/application/service/ExpireBookingsService.java
++++ b/services/booking-service/src/main/java/com/eventhub/booking/application/service/ExpireBookingsService.java
+@@ -62,6 +62,7 @@ public class ExpireBookingsService implements ExpireBookingsUseCase {
+     List<DomainEvent> events = booking.pullDomainEvents();
+     bookings.save(booking);
+     inventory.release(booking.eventId(), booking.requestedItems());
++    inventory.release(booking.eventId(), booking.requestedItems()); // MUTATION: released twice
+     publisher.publish(events);
+   }
+ }
