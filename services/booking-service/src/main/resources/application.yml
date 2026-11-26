@@ -31,7 +31,28 @@ spring:
 server:
   port: 8082
 
+# Tunables of the service (see BookingProperties). Validated at startup: a bad value stops it.
+eventhub:
+  booking:
+    hold-duration: 10m
+    max-tickets: 6
+    expiration:
+      batch-size: 50
+      poll-interval: 30s
+    reconciler:
+      initiated-stale-after: 5m
+      initial-backoff: 30s
+      max-backoff: 10m
+      batch-size: 20
+      poll-interval: 1m
+    cascade:
+      batch-size: 50
+
 management:
+  server:
+    # Actuator on its own port, away from the public API. The local and test profiles put it
+    # back on the server port so it is easy to reach and to test.
+    port: 8083
   tracing:
     # traceId/spanId reach the logging context and the problem+json bodies. Nothing is exported
     # unless an operator turns an exporter on and gives it an endpoint.

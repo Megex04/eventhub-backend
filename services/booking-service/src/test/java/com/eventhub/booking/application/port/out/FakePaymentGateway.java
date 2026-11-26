@@ -64,6 +64,21 @@ public final class FakePaymentGateway implements PaymentGateway {
   private volatile Gate refundGate;
   private volatile boolean alwaysFailRefunds;
 
+  /** Back to a brand new gateway: no gate, no pending failures, no memory of earlier calls. */
+  public void reset() {
+    charges.clear();
+    refunded.clear();
+    approved.clear();
+    chargeCalls.set(0);
+    refundCalls.set(0);
+    chargeGate = null;
+    refundGate = null;
+    alwaysFailRefunds = false;
+    failChargesBefore.set(0);
+    failChargesAfter.set(0);
+    failRefunds.set(0);
+  }
+
   public Gate holdCharges() {
     Gate gate = new Gate();
     this.chargeGate = gate;

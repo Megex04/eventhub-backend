@@ -1,0 +1,5 @@
+# The test profile serves the actuator on the same port as the API, as the local profile does, so
+# MockMvc can reach it. The separate management port is exercised by ManagementPortIT.
+management:
+  server:
+    port: 8082
