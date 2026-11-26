@@ -1,6 +1,7 @@
 package com.eventhub.booking.application.service;
 
 import com.eventhub.booking.application.exception.PaymentDeclinedException;
+import com.eventhub.booking.application.exception.PaymentRefundPendingException;
 import com.eventhub.booking.application.exception.PaymentRefundedException;
 import com.eventhub.booking.application.port.in.PayBookingCommand;
 import com.eventhub.booking.application.port.in.PayBookingUseCase;
@@ -11,6 +12,7 @@ import com.eventhub.booking.application.port.out.DomainEventPublisher;
 import com.eventhub.booking.application.port.out.IdGenerator;
 import com.eventhub.booking.application.port.out.PaymentGateway;
 import com.eventhub.booking.application.port.out.PaymentGatewayException;
+import com.eventhub.booking.application.port.out.PaymentMetrics;
 import com.eventhub.booking.application.port.out.TransactionRunner;
 import com.eventhub.booking.domain.Booking;
 import com.eventhub.booking.domain.Booking.CaptureOutcome;
@@ -44,6 +46,7 @@ public class PayBookingService implements PayBookingUseCase {
   private final Clock clock;
   private final PaymentOutcomes outcomes;
   private final RefundSettler refunds;
+  private final PaymentMetrics metrics;
 
   public PayBookingService(
       TransactionRunner transactions,
@@ -51,7 +54,8 @@ public class PayBookingService implements PayBookingUseCase {
       DomainEventPublisher publisher,
       IdGenerator ids,
       PaymentGateway gateway,
-      Clock clock) {
+      Clock clock,
+      PaymentMetrics metrics) {
     this.transactions = transactions;
     this.bookings = bookings;
     this.ids = ids;
@@ -59,6 +63,7 @@ public class PayBookingService implements PayBookingUseCase {
     this.clock = clock;
     this.outcomes = new PaymentOutcomes(transactions, bookings, publisher, clock);
     this.refunds = new RefundSettler(transactions, bookings, publisher, gateway, clock);
+    this.metrics = metrics;
   }
 
   @Override
@@ -101,8 +106,12 @@ public class PayBookingService implements PayBookingUseCase {
     if (captured.outcome() == CaptureOutcome.CONFIRMED) {
       return captured.booking();
     }
-    refunds.settle(bookingId);
-    throw new PaymentRefundedException();
+    // The captured state is committed: from here on the refund is best effort.
+    if (refunds.settle(bookingId)) {
+      throw new PaymentRefundedException();
+    }
+    metrics.immediateRefundFailed(bookingId);
+    throw new PaymentRefundPendingException();
   }
 
   /** Step 3, declined: the booking stays PENDING and can be paid again. */

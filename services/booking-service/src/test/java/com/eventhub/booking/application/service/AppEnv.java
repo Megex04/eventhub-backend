@@ -38,6 +38,7 @@ public final class AppEnv {
   public final RecordingDomainEventPublisher publisher = new RecordingDomainEventPublisher(store);
   public final SequentialIdGenerator ids = new SequentialIdGenerator(1000);
   public final FakePaymentGateway gateway = new FakePaymentGateway();
+  public final RecordingPaymentMetrics metrics = new RecordingPaymentMetrics();
 
   /** The fixture event, open for sale, with inventory for both zones. */
   public AppEnv withOpenEvent() {

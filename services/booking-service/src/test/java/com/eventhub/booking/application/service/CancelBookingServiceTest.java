@@ -34,7 +34,8 @@ class CancelBookingServiceTest {
           env.projections,
           env.publisher,
           env.gateway,
-          env.clock);
+          env.clock,
+          env.metrics);
 
   private void pendingBooking() {
     Booking booking = newBooking(BOOKING, USER, env.clock, new RequestedItem(VIP_ZONE, 2));
@@ -45,7 +46,8 @@ class CancelBookingServiceTest {
 
   private void confirmedBooking() {
     pendingBooking();
-    new PayBookingService(env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock)
+    new PayBookingService(
+            env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock, env.metrics)
         .pay(new PayBookingCommand(USER, BOOKING, "tok_approved"));
     env.publisher.events(); // the payment events are not what these tests look at
   }
@@ -92,6 +94,39 @@ class CancelBookingServiceTest {
     assertThat(env.reserved(VIP_ZONE)).isZero();
     assertThat(env.publisher.eventsOfType(BookingPaymentRefunded.class)).isEmpty();
     assertThat(env.gateway.holds(result.payment().orElseThrow().id())).isTrue();
+    assertThat(env.metrics.immediateRefundFailures()).containsExactly(BOOKING);
+  }
+
+  @Test
+  void should_answer_with_the_cancelled_booking_when_the_refund_cannot_be_recorded() {
+    confirmedBooking();
+    CancelBookingService recordingFails =
+        new CancelBookingService(
+            env.tx,
+            env.bookings,
+            env.inventory,
+            env.projections,
+            new FailingRefundEventsPublisher(env.publisher),
+            env.gateway,
+            env.clock,
+            env.metrics);
+
+    Booking result = recordingFails.cancel(USER, BOOKING);
+
+    assertThat(result.status()).isEqualTo(BookingStatus.CANCELLED);
+    assertThat(result.payment().orElseThrow().status()).isEqualTo(PaymentStatus.REFUND_PENDING);
+    assertThat(env.reserved(VIP_ZONE)).as("released with the cancellation").isZero();
+    assertThat(env.gateway.wasRefunded(result.payment().orElseThrow().id())).isTrue();
+    assertThat(env.metrics.immediateRefundFailures()).containsExactly(BOOKING);
+  }
+
+  @Test
+  void should_not_count_a_failed_immediate_refund_when_the_refund_completes() {
+    confirmedBooking();
+
+    service.cancel(USER, BOOKING);
+
+    assertThat(env.metrics.immediateRefundFailures()).isEmpty();
   }
 
   @Test

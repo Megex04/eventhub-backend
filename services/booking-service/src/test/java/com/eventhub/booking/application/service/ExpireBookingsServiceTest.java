@@ -84,7 +84,8 @@ class ExpireBookingsServiceTest {
   @Test
   void should_not_touch_confirmed_bookings() {
     pendingBooking(1, 2);
-    new PayBookingService(env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock)
+    new PayBookingService(
+            env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock, env.metrics)
         .pay(new PayBookingCommand(USER, uuid(1), "tok_approved"));
     env.clock.advance(Duration.ofHours(1));
 

@@ -14,6 +14,7 @@ import com.eventhub.booking.application.port.out.ChargeResult;
 import com.eventhub.booking.application.port.out.ConcurrencyConflictException;
 import com.eventhub.booking.application.port.out.FakePaymentGateway;
 import com.eventhub.booking.application.port.out.PaymentGateway;
+import com.eventhub.booking.application.port.out.PersistenceFailureException;
 import com.eventhub.booking.application.port.out.RefundRequest;
 import com.eventhub.booking.domain.Booking;
 import com.eventhub.booking.domain.CancelReason;
@@ -102,6 +103,35 @@ class TransactionBoundariesIT {
 
     assertThatThrownBy(() -> app.tx.run(() -> app.bookings.save(stale)))
         .isInstanceOf(ConcurrencyConflictException.class);
+  }
+
+  @Test
+  void should_report_a_database_error_inside_the_block_as_a_persistence_failure() {
+    assertThatThrownBy(() -> app.tx.run(() -> app.jdbc.execute("SELECT * FROM no_such_table")))
+        .isInstanceOf(PersistenceFailureException.class)
+        .isNotInstanceOf(ConcurrencyConflictException.class);
+  }
+
+  @Test
+  void
+      should_report_a_failure_that_only_shows_at_commit_as_a_persistence_failure_when_it_is_not_a_race() {
+    app.jdbc.execute("CREATE TABLE IF NOT EXISTS runner_probe_fail (n integer)");
+    app.jdbc.execute("TRUNCATE runner_probe_fail");
+    app.jdbc.execute(
+        "CREATE OR REPLACE FUNCTION it_fail_at_commit() RETURNS trigger LANGUAGE plpgsql AS $$"
+            + " BEGIN RAISE EXCEPTION 'simulated commit failure'; END $$");
+    app.jdbc.execute(
+        "CREATE CONSTRAINT TRIGGER it_runner_fail AFTER INSERT ON runner_probe_fail"
+            + " DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION it_fail_at_commit()");
+    try {
+      assertThatThrownBy(
+              () -> app.tx.run(() -> app.jdbc.update("INSERT INTO runner_probe_fail VALUES (1)")))
+          .isInstanceOf(PersistenceFailureException.class);
+      assertThat(app.count("SELECT count(*) FROM runner_probe_fail")).isZero();
+    } finally {
+      app.jdbc.execute("DROP TRIGGER IF EXISTS it_runner_fail ON runner_probe_fail");
+      app.jdbc.execute("DROP FUNCTION IF EXISTS it_fail_at_commit()");
+    }
   }
 
   // ---- 3. the gateway is never called inside a transaction ----

@@ -29,7 +29,8 @@ class ReconcileRefundsServiceTest {
 
   private final AppEnv env = new AppEnv().withOpenEvent();
   private final PayBookingService pay =
-      new PayBookingService(env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock);
+      new PayBookingService(
+          env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock, env.metrics);
   private final ReconcileRefundsService reconciler =
       new ReconcileRefundsService(
           env.tx,

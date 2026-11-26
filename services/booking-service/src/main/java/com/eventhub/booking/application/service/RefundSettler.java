@@ -4,6 +4,7 @@ import com.eventhub.booking.application.port.out.BookingRepository;
 import com.eventhub.booking.application.port.out.DomainEventPublisher;
 import com.eventhub.booking.application.port.out.PaymentGateway;
 import com.eventhub.booking.application.port.out.PaymentGatewayException;
+import com.eventhub.booking.application.port.out.PersistenceFailureException;
 import com.eventhub.booking.application.port.out.RefundRequest;
 import com.eventhub.booking.application.port.out.TransactionRunner;
 import com.eventhub.booking.domain.Booking;
@@ -18,7 +19,8 @@ import java.util.UUID;
 /**
  * Gives the money back for a payment that is REFUND_PENDING: the gateway call happens outside any
  * transaction, and only an answer from the gateway lets a short transaction mark it REFUNDED. If
- * the gateway fails the payment simply stays REFUND_PENDING for the reconciler.
+ * the gateway fails, or the result cannot be recorded, the payment simply stays REFUND_PENDING for
+ * the reconciler; the caller learns it from the result and is never failed by it.
  */
 final class RefundSettler {
 
@@ -43,28 +45,30 @@ final class RefundSettler {
 
   /**
    * True when the payment is REFUNDED after the call (also when somebody else got there first);
-   * false when the gateway could not refund it now.
+   * false when it is still REFUND_PENDING because the gateway could not refund it now or the
+   * database could not record the refund. Only those two failures are absorbed.
    */
   boolean settle(UUID bookingId) {
-    Optional<Payment> pending = pendingRefund(bookingId);
-    if (pending.isEmpty()) {
-      return true;
-    }
-    Payment payment = pending.get();
     try {
+      Optional<Payment> pending = pendingRefund(bookingId);
+      if (pending.isEmpty()) {
+        return true;
+      }
+      Payment payment = pending.get();
       gateway.refund(new RefundRequest(payment.id(), payment.amount()));
-    } catch (PaymentGatewayException unreachable) {
+      VersionRetry.run(transactions, () -> complete(bookingId));
+      return true;
+    } catch (PaymentGatewayException | PersistenceFailureException notNow) {
       return false;
     }
-    VersionRetry.run(transactions, () -> complete(bookingId));
-    return true;
   }
 
   private Optional<Payment> pendingRefund(UUID bookingId) {
-    return bookings
-        .findById(bookingId)
-        .flatMap(Booking::payment)
-        .filter(payment -> payment.status() == PaymentStatus.REFUND_PENDING);
+    return transactions.execute(() ->
+        bookings
+            .findById(bookingId)
+            .flatMap(Booking::payment)
+            .filter(payment -> payment.status() == PaymentStatus.REFUND_PENDING));
   }
 
   private Booking complete(UUID bookingId) {

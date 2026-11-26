@@ -1,9 +1,11 @@
 package com.eventhub.booking.infrastructure.adapter.out.persistence;
 
 import com.eventhub.booking.application.port.out.ConcurrencyConflictException;
+import com.eventhub.booking.application.port.out.PersistenceFailureException;
 import com.eventhub.booking.application.port.out.TransactionRunner;
 import java.util.function.Supplier;
 import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,7 +38,9 @@ class SpringTransactionRunner implements TransactionRunner {
       if (Conflicts.isConcurrencyFailure(e)) {
         throw new ConcurrencyConflictException("Commit lost a race: " + e.getMessage(), e);
       }
-      throw e;
+      throw new PersistenceFailureException("The commit failed: " + e.getMessage(), e);
+    } catch (DataAccessException e) {
+      throw new PersistenceFailureException("The database failed: " + e.getMessage(), e);
     }
   }
 }

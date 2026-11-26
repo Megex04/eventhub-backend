@@ -14,9 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.eventhub.booking.application.exception.IdempotencyKeyReuseException;
 import com.eventhub.booking.application.exception.NotFoundException;
 import com.eventhub.booking.application.exception.PaymentDeclinedException;
+import com.eventhub.booking.application.exception.PaymentRefundPendingException;
 import com.eventhub.booking.application.exception.PaymentRefundedException;
 import com.eventhub.booking.application.port.out.ConcurrencyConflictException;
 import com.eventhub.booking.application.port.out.DuplicateIdempotencyKeyException;
+import com.eventhub.booking.application.port.out.PersistenceFailureException;
 import com.eventhub.booking.domain.Booking;
 import com.eventhub.booking.domain.CancelReason;
 import com.eventhub.booking.domain.EventProjection;
@@ -107,6 +109,17 @@ class GlobalExceptionHandlerTest {
             (Supplier<RuntimeException>) () -> new PaymentInProgressException(uuid(9)),
             409,
             "payment-in-progress"),
+        Arguments.of(
+            "payment refund pending",
+            (Supplier<RuntimeException>) PaymentRefundPendingException::new,
+            409,
+            "payment-refund-pending"),
+        Arguments.of(
+            "persistence failure",
+            (Supplier<RuntimeException>)
+                () -> new PersistenceFailureException("db down", new RuntimeException("secret")),
+            500,
+            "internal-error"),
         Arguments.of(
             "payment refunded",
             (Supplier<RuntimeException>) PaymentRefundedException::new,

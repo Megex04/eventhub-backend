@@ -14,6 +14,7 @@ import com.eventhub.booking.application.port.out.EventProjectionRepository;
 import com.eventhub.booking.application.port.out.IdGenerator;
 import com.eventhub.booking.application.port.out.InventoryRepository;
 import com.eventhub.booking.application.port.out.PaymentGateway;
+import com.eventhub.booking.application.port.out.PaymentMetrics;
 import com.eventhub.booking.application.port.out.ProcessedMessageRepository;
 import com.eventhub.booking.application.port.out.ReconciliationRepository;
 import com.eventhub.booking.application.port.out.TransactionRunner;
@@ -39,6 +40,7 @@ public final class RealApp {
   public final ProcessedMessageRepository processed;
   public final ReconciliationRepository reconciliation;
   public final IdGenerator ids;
+  public final PaymentMetrics metrics;
   public final MutableClock clock;
   public final JdbcTemplate jdbc;
   public final DomainEventPublisher publisher;
@@ -53,6 +55,7 @@ public final class RealApp {
     this.reconciliation = context.getBean(ReconciliationRepository.class);
     this.ids = context.getBean(IdGenerator.class);
     this.clock = context.getBean(MutableClock.class);
+    this.metrics = context.getBean(PaymentMetrics.class);
     this.jdbc = context.getBean(JdbcTemplate.class);
   }
 
@@ -67,11 +70,11 @@ public final class RealApp {
 
   public CancelBookingService cancel(PaymentGateway gateway) {
     return new CancelBookingService(
-        tx, bookings, inventory, projections, publisher, gateway, clock);
+        tx, bookings, inventory, projections, publisher, gateway, clock, metrics);
   }
 
   public PayBookingService pay(PaymentGateway gateway) {
-    return new PayBookingService(tx, bookings, publisher, ids, gateway, clock);
+    return new PayBookingService(tx, bookings, publisher, ids, gateway, clock, metrics);
   }
 
   /** The fixture event, open, with the given capacity in its VIP and General zones. */

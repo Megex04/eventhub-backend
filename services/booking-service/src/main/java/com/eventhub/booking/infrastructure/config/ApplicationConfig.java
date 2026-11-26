@@ -17,6 +17,7 @@ import com.eventhub.booking.application.port.out.EventProjectionRepository;
 import com.eventhub.booking.application.port.out.IdGenerator;
 import com.eventhub.booking.application.port.out.InventoryRepository;
 import com.eventhub.booking.application.port.out.PaymentGateway;
+import com.eventhub.booking.application.port.out.PaymentMetrics;
 import com.eventhub.booking.application.port.out.ProcessedMessageRepository;
 import com.eventhub.booking.application.port.out.ReconciliationRepository;
 import com.eventhub.booking.application.port.out.TransactionRunner;
@@ -82,8 +83,9 @@ class ApplicationConfig {
       DomainEventPublisher publisher,
       IdGenerator ids,
       PaymentGateway gateway,
-      Clock clock) {
-    return new PayBookingService(transactions, bookings, publisher, ids, gateway, clock);
+      Clock clock,
+      PaymentMetrics metrics) {
+    return new PayBookingService(transactions, bookings, publisher, ids, gateway, clock, metrics);
   }
 
   @Bean
@@ -94,9 +96,10 @@ class ApplicationConfig {
       EventProjectionRepository projections,
       DomainEventPublisher publisher,
       PaymentGateway gateway,
-      Clock clock) {
+      Clock clock,
+      PaymentMetrics metrics) {
     return new CancelBookingService(
-        transactions, bookings, inventory, projections, publisher, gateway, clock);
+        transactions, bookings, inventory, projections, publisher, gateway, clock, metrics);
   }
 
   @Bean

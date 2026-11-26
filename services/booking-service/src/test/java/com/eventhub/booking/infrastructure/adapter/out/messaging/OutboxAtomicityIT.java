@@ -9,13 +9,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.eventhub.booking.application.port.in.ReconcileRefundsUseCase;
 import com.eventhub.booking.application.port.in.ReconcileReport;
+import com.eventhub.booking.application.port.out.FakePaymentGateway.Gate;
 import com.eventhub.booking.infrastructure.adapter.in.web.ApiIT;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
@@ -36,6 +42,7 @@ class OutboxAtomicityIT extends ApiIT {
       """;
 
   @Autowired private ReconcileRefundsUseCase reconcile;
+  @Autowired private MeterRegistry meters;
 
   @AfterEach
   void dropTriggers() {
@@ -78,6 +85,10 @@ class OutboxAtomicityIT extends ApiIT {
   private List<String> outboxTypes() {
     return app.jdbc.queryForList(
         "SELECT event_type FROM outbox_event ORDER BY created_at, id", String.class);
+  }
+
+  private double immediateRefundFailures() {
+    return meters.counter("payments.refund.immediate.failed").count();
   }
 
   private String paymentStatus(UUID bookingId) {
@@ -219,10 +230,16 @@ class OutboxAtomicityIT extends ApiIT {
     pay(alice, id, "tok_approved").andExpect(status().isOk());
     failImmediately("BookingPaymentRefunded");
 
-    // The cancellation itself is committed; completing the refund is what fails. The caller is told
-    // the request failed even though the booking is cancelled: known, to be revisited.
-    expectInternalError(cancel(alice, id));
+    double failedBefore = immediateRefundFailures();
 
+    // The cancellation itself is committed; completing the refund is what fails. The caller gets
+    // the committed state, not an error: the refund is best effort and the reconciler finishes it.
+    cancel(alice, id)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.payment.status").value("REFUND_PENDING"));
+
+    assertThat(immediateRefundFailures() - failedBefore).isEqualTo(1);
     assertThat(bookingStatus(id)).isEqualTo("CANCELLED");
     assertThat(paymentStatus(id)).isEqualTo("REFUND_PENDING");
     assertThat(outboxTypes())
@@ -238,7 +255,7 @@ class OutboxAtomicityIT extends ApiIT {
     UUID id = booked(alice, 1);
     pay(alice, id, "tok_approved").andExpect(status().isOk());
     failImmediately("BookingPaymentRefunded");
-    expectInternalError(cancel(alice, id));
+    cancel(alice, id).andExpect(status().isOk());
     dropTriggers();
 
     ReconcileReport report = reconcile.reconcile();
@@ -249,6 +266,41 @@ class OutboxAtomicityIT extends ApiIT {
         .containsExactly(
             "BookingCreated", "BookingConfirmed", "BookingCancelled", "BookingPaymentRefunded");
     assertThat(gateway.distinctRefunds()).as("refunded once, however many attempts").isEqualTo(1);
+  }
+
+  @Test
+  void should_answer_refund_pending_in_pay_and_let_the_reconciler_finish_it() throws Exception {
+    UUID id = booked(alice, 2);
+    Gate gate = gateway.holdCharges();
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    double failedBefore = immediateRefundFailures();
+    try {
+      Future<MockHttpServletResponse> paying =
+          pool.submit(() -> pay(alice, id, "tok_approved").andReturn().getResponse());
+      gate.awaitArrival();
+      clock.set(EXPIRES_AT);
+      failImmediately("BookingPaymentRefunded");
+      gate.open();
+
+      MockHttpServletResponse response = paying.get();
+      assertThat(response.getStatus()).isEqualTo(409);
+      assertThat(response.getContentAsString()).contains(TYPE_BASE + "payment-refund-pending");
+    } finally {
+      pool.shutdownNow();
+    }
+
+    assertThat(immediateRefundFailures() - failedBefore).isEqualTo(1);
+    assertThat(bookingStatus(id)).isEqualTo("PENDING");
+    assertThat(paymentStatus(id)).isEqualTo("REFUND_PENDING");
+    assertThat(outboxTypes()).containsExactly("BookingCreated");
+    dropTriggers();
+
+    ReconcileReport report = reconcile.reconcile();
+
+    assertThat(report.refundsCompleted()).isEqualTo(1);
+    assertThat(paymentStatus(id)).isEqualTo("REFUNDED");
+    assertThat(outboxTypes()).containsExactly("BookingCreated", "BookingPaymentRefunded");
+    assertThat(gateway.distinctRefunds()).isEqualTo(1);
   }
 
   // ---------------------------------------------------------------- cancel and expire

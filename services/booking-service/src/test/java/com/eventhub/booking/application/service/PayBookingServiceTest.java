@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.eventhub.booking.application.exception.NotFoundException;
 import com.eventhub.booking.application.exception.PaymentDeclinedException;
+import com.eventhub.booking.application.exception.PaymentRefundPendingException;
 import com.eventhub.booking.application.exception.PaymentRefundedException;
 import com.eventhub.booking.application.port.in.PayBookingCommand;
 import com.eventhub.booking.application.port.out.BookingRepository;
@@ -47,7 +48,8 @@ class PayBookingServiceTest {
   private final ExecutorService pool = Executors.newCachedThreadPool();
 
   private PayBookingService service(BookingRepository bookings) {
-    return new PayBookingService(env.tx, bookings, env.publisher, env.ids, gateway, env.clock);
+    return new PayBookingService(
+        env.tx, bookings, env.publisher, env.ids, gateway, env.clock, env.metrics);
   }
 
   @AfterEach
@@ -327,12 +329,52 @@ class PayBookingServiceTest {
 
     Throwable failure = payWhile(env -> env.clock.set(EXPIRES_AT));
 
-    assertThat(failure).isInstanceOf(PaymentRefundedException.class);
+    assertThat(failure).isInstanceOf(PaymentRefundPendingException.class);
     assertThat(storedPayment().status()).isEqualTo(PaymentStatus.REFUND_PENDING);
     assertThat(storedPayment().refundReason())
         .contains(RefundReason.BOOKING_EXPIRED_DURING_PAYMENT);
     assertThat(env.publisher.eventsOfType(BookingPaymentRefunded.class)).isEmpty();
     assertThat(env.gateway.holds(storedPayment().id())).isTrue();
+    assertThat(env.metrics.immediateRefundFailures()).containsExactly(BOOKING);
+  }
+
+  @Test
+  void should_answer_refund_pending_when_the_refund_cannot_be_recorded_after_the_gateway_paid_back()
+      throws Exception {
+    pendingBooking();
+    PayBookingService recordingFails =
+        new PayBookingService(
+            env.tx,
+            env.bookings,
+            new FailingRefundEventsPublisher(env.publisher),
+            env.ids,
+            gateway,
+            env.clock,
+            env.metrics);
+    Gate gate = env.gateway.holdCharges();
+    Future<Booking> paying = pool.submit(() -> recordingFails.pay(pay(APPROVED)));
+    gate.awaitArrival();
+    env.clock.set(EXPIRES_AT);
+    gate.open();
+
+    Throwable failure = failureOf(paying);
+
+    assertThat(failure).isInstanceOf(PaymentRefundPendingException.class);
+    assertThat(storedPayment().status())
+        .as("the money went back at the gateway, but it was not recorded")
+        .isEqualTo(PaymentStatus.REFUND_PENDING);
+    assertThat(env.gateway.wasRefunded(storedPayment().id())).isTrue();
+    assertThat(env.metrics.immediateRefundFailures()).containsExactly(BOOKING);
+  }
+
+  @Test
+  void should_not_count_a_failed_immediate_refund_when_the_refund_completes() throws Exception {
+    pendingBooking();
+
+    Throwable failure = payWhile(env -> env.clock.set(EXPIRES_AT));
+
+    assertThat(failure).isInstanceOf(PaymentRefundedException.class);
+    assertThat(env.metrics.immediateRefundFailures()).isEmpty();
   }
 
   @Test

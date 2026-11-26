@@ -255,6 +255,29 @@ class BookingApiIT extends ApiIT {
   }
 
   @Test
+  void should_answer_409_refund_pending_when_the_refund_cannot_be_completed_right_now()
+      throws Exception {
+    UUID id = booked(alice, 2);
+    gateway.failAllRefunds(true);
+    Gate gate = gateway.holdCharges();
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    try {
+      Future<MockHttpServletResponse> paying =
+          pool.submit(() -> pay(alice, id, "tok_approved").andReturn().getResponse());
+      gate.awaitArrival();
+      clock.set(EXPIRES_AT);
+      gate.open();
+
+      MockHttpServletResponse response = paying.get();
+      assertThat(response.getStatus()).isEqualTo(409);
+      assertThat(contentOf(response)).contains(TYPE_BASE + "payment-refund-pending");
+    } finally {
+      pool.shutdownNow();
+    }
+    fetch(alice, id).andExpect(jsonPath("$.payment.status").value("REFUND_PENDING"));
+  }
+
+  @Test
   void should_refund_and_answer_409_when_the_hold_ends_while_the_charge_is_running()
       throws Exception {
     UUID id = booked(alice, 2);

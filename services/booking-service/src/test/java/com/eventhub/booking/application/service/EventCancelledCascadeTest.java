@@ -47,7 +47,8 @@ class EventCancelledCascadeTest {
     env.bookings.saveNew(booking, new IdempotencyRecord(USER, uuid(900 + id), "fp" + id));
     env.inventory.reserve(EVENT, booking.requestedItems());
     if (paid) {
-      new PayBookingService(env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock)
+      new PayBookingService(
+              env.tx, env.bookings, env.publisher, env.ids, env.gateway, env.clock, env.metrics)
           .pay(new PayBookingCommand(USER, uuid(id), "tok_approved"));
     }
   }

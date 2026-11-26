@@ -7,6 +7,7 @@ import com.eventhub.booking.application.port.out.DomainEventPublisher;
 import com.eventhub.booking.application.port.out.EventProjectionRepository;
 import com.eventhub.booking.application.port.out.InventoryRepository;
 import com.eventhub.booking.application.port.out.PaymentGateway;
+import com.eventhub.booking.application.port.out.PaymentMetrics;
 import com.eventhub.booking.application.port.out.TransactionRunner;
 import com.eventhub.booking.domain.Booking;
 import com.eventhub.booking.domain.CancelReason;
@@ -31,6 +32,7 @@ public class CancelBookingService implements CancelBookingUseCase {
   private final DomainEventPublisher publisher;
   private final Clock clock;
   private final RefundSettler refunds;
+  private final PaymentMetrics metrics;
 
   public CancelBookingService(
       TransactionRunner transactions,
@@ -39,7 +41,8 @@ public class CancelBookingService implements CancelBookingUseCase {
       EventProjectionRepository projections,
       DomainEventPublisher publisher,
       PaymentGateway gateway,
-      Clock clock) {
+      Clock clock,
+      PaymentMetrics metrics) {
     this.transactions = transactions;
     this.bookings = bookings;
     this.inventory = inventory;
@@ -47,13 +50,15 @@ public class CancelBookingService implements CancelBookingUseCase {
     this.publisher = publisher;
     this.clock = clock;
     this.refunds = new RefundSettler(transactions, bookings, publisher, gateway, clock);
+    this.metrics = metrics;
   }
 
   @Override
   public Booking cancel(UUID userId, UUID bookingId) {
     Booking cancelled = VersionRetry.run(transactions, () -> cancelAndRelease(userId, bookingId));
-    if (refundIsPending(cancelled)) {
-      refunds.settle(bookingId);
+    // The cancellation is committed: the refund is best effort, whatever happens to it.
+    if (refundIsPending(cancelled) && !refunds.settle(bookingId)) {
+      metrics.immediateRefundFailed(bookingId);
     }
     return bookings.findById(bookingId).orElseThrow();
   }

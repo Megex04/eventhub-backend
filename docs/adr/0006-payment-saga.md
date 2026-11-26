@@ -122,6 +122,46 @@ intervalo. Es una decision de producto, no un olvido: evita perder una venta ya 
 minutos y mantiene `pay` sin regla de negocio adicional, de modo que el contrato (`booking-api.yaml`,
 que no declara 422 para `pay`) no cambia.
 
+### El reembolso inmediato es de mejor esfuerzo
+
+Tras el primer commit (la reserva `CANCELLED`, o el pago `CAPTURED` de una reserva que ya no era
+pagable), el reembolso inmediato y su registro **no pueden convertir en error algo ya confirmado**.
+`TransactionRunner` traduce todo fallo de base de datos que no es una carrera perdida a
+`PersistenceFailureException` (un tipo de la aplicacion, sin Spring); `RefundSettler` captura **solo**
+ese tipo y el error de la pasarela (nunca `catch (Exception)`). Si el reembolso no se completa, el pago
+queda `REFUND_PENDING`, se registra un log y se incrementa `payments.refund.immediate.failed`, y el
+reconciliador lo termina:
+
+- `cancel` devuelve **200** con la reserva `CANCELLED` y el pago `REFUND_PENDING`.
+- `pay` con la reserva ya no pagable responde **409 `payment-refunded`** si el pago quedo `REFUNDED` y
+  **409 `payment-refund-pending`** si sigue pendiente. Ambos son 409 del contrato (que ya declara el
+  409 de `pay`): solo cambia el `type`. El cliente nunca ve un 500 por un cobro que ya se decidio.
+
+Un fallo **antes** del primer commit (guardar la intencion, o aplicar el resultado del cobro) si
+termina la peticion (500): no hay nada confirmado que proteger, y el pago `INITIATED` lo resuelve el
+reconciliador.
+
+### Orden de los eventos de una reserva: `created_at = max(reserva) + 1 microsegundo`
+
+El relay envia las filas de una reserva en orden `created_at, id`, y `id` es un UUID aleatorio: si dos
+eventos de la misma reserva comparten `created_at`, el orden de envio es **arbitrario**, y un
+`BookingConfirmed` podria llegar antes que su `BookingCreated`. Pasa con un reloj que no avanza entre
+dos transacciones (tests), pero tambien con relojes distintos entre instancias del servicio: una
+instancia adelantada escribe un evento y otra, atrasada, escribe el siguiente con un instante anterior.
+
+Por eso `OutboxDomainEventPublisher` no se fia del reloj: cada fila recibe
+`GREATEST(ahora, max(created_at de esa reserva) + 1 us)`, calculado en la misma sentencia `INSERT`. Los
+escritores de una misma reserva estan serializados por el reclamo de version de la fila `booking`, de
+modo que el maximo que lee es el del evento anterior. Un indice `(aggregate_id, created_at DESC)`
+(migracion V2) sirve la consulta, porque el indice parcial de V1 solo cubre filas sin publicar.
+
+Solo se escalona `created_at`. `next_attempt_at` es el reloj, de modo que una fila esta vencida de
+inmediato aunque su instante de orden vaya unos microsegundos por delante. Un primer intento reutilizaba
+`created_at` para ambos y las filas "futuras" no se enviaban: lo detecto un test con un reloj fijo.
+
+Se aparta de `catalog-service`, que solo separa por un microsegundo los eventos de **una misma
+llamada**. Catalog no se modifica; el mismo riesgo existe alli y se anota para una decision aparte.
+
 ## Consecuencias
 
 - Tres transacciones cortas en lugar de una larga: mas piezas, pero ningun lock se mantiene durante una
@@ -142,6 +182,13 @@ que no declara 422 para `pay`) no cambia.
   `Idempotency-Key` -> una reserva, entradas retenidas una vez.
 - `ReconcileRefundsServiceTest`: reembolsos pendientes (incluidos los de la cascada), backoff
   exponencial con tope, huerfanos confirmados / reembolsados / rechazados / no resueltos.
+- Reembolso de mejor esfuerzo: `OutboxAtomicityIT` cancela con el outbox fallando al registrar el
+  reembolso (200, `REFUND_PENDING`, metrica +1, el reconciliador lo termina) y hace lo equivalente en
+  `pay` (409 `payment-refund-pending`); `TransactionBoundariesIT` comprueba que un fallo de base de datos
+  dentro del bloque y uno al confirmar llegan como `PersistenceFailureException` y una carrera perdida
+  como `ConcurrencyConflictException`.
+- Orden por reserva: `OutboxPublisherIT` escribe eventos de la misma reserva con el reloj quieto y con el
+  reloj retrocediendo, y comprueba que `created_at` crece estrictamente.
 - Mutaciones comprobadas: quitar el reembolso compensatorio de `pay` (fallan 4 tests), quitar el
   registro de backoff del reconciliador (fallan 3), romper la resolucion de huerfanos aprobados
   (fallan 6), liberar el inventario dos veces en la cascada (fallan 8).

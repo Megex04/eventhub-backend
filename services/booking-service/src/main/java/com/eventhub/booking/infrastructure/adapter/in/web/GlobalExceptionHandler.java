@@ -3,9 +3,11 @@ package com.eventhub.booking.infrastructure.adapter.in.web;
 import com.eventhub.booking.application.exception.IdempotencyKeyReuseException;
 import com.eventhub.booking.application.exception.NotFoundException;
 import com.eventhub.booking.application.exception.PaymentDeclinedException;
+import com.eventhub.booking.application.exception.PaymentRefundPendingException;
 import com.eventhub.booking.application.exception.PaymentRefundedException;
 import com.eventhub.booking.application.port.out.ConcurrencyConflictException;
 import com.eventhub.booking.application.port.out.DuplicateIdempotencyKeyException;
+import com.eventhub.booking.application.port.out.PersistenceFailureException;
 import com.eventhub.booking.domain.BusinessRuleViolationException;
 import com.eventhub.booking.domain.InsufficientInventoryException;
 import com.eventhub.booking.domain.InvalidStateException;
@@ -103,6 +105,20 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   ResponseEntity<ProblemDetail> handlePaymentRefunded(
       PaymentRefundedException ex, HttpServletRequest request) {
     return conflict("payment-refunded", "Payment refunded", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(PaymentRefundPendingException.class)
+  ResponseEntity<ProblemDetail> handlePaymentRefundPending(
+      PaymentRefundPendingException ex, HttpServletRequest request) {
+    return conflict("payment-refund-pending", "Payment refund pending", ex.getMessage(), request);
+  }
+
+  /** The use case already decided what to do; this is only for a failure that ends the request. */
+  @ExceptionHandler(PersistenceFailureException.class)
+  ResponseEntity<ProblemDetail> handlePersistenceFailure(
+      PersistenceFailureException ex, HttpServletRequest request) {
+    log.error("Persistence failure on {} {}", request.getMethod(), request.getRequestURI(), ex);
+    return internalError(request);
   }
 
   @ExceptionHandler(InsufficientInventoryException.class)
