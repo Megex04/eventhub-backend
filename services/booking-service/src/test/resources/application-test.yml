@@ -3,3 +3,9 @@
 management:
   server:
     port: 8082
+
+# No background jobs in tests: they call the use cases themselves, so nothing happens behind their back.
+eventhub:
+  booking:
+    expiration:
+      enabled: false

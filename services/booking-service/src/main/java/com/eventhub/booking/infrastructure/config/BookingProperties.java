@@ -28,7 +28,9 @@ public record BookingProperties(
 
   /** The job that expires bookings whose hold ended. */
   public record Expiration(
-      @Min(1) int batchSize, @NotNull @DurationMin(nanos = 1) Duration pollInterval) {}
+      boolean enabled,
+      @Min(1) int batchSize,
+      @NotNull @DurationMin(nanos = 1) Duration pollInterval) {}
 
   /** The job that finishes pending refunds and charges left initiated. */
   public record Reconciler(

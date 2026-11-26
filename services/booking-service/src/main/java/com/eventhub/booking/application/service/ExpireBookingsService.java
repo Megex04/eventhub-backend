@@ -11,11 +11,15 @@ import java.time.Clock;
 import java.util.List;
 
 /**
- * Expires one batch of PENDING bookings whose hold ended, in one transaction. The batch is read
- * with {@code findExpirable}, which the real adapter locks (SKIP LOCKED), so several instances
- * never take the same booking and a payment saving at the same moment waits instead of racing.
- * Tickets are released here, on the transition, and nowhere else: a booking that is no longer
- * PENDING is never returned, so they cannot be released twice.
+ * Expires PENDING bookings whose hold ended, one transaction per booking: a failure on one never
+ * undoes the others, and a lock is held only for the booking being expired. Each transaction reads
+ * its booking with {@code findExpirable(now, 1)}, which the real adapter locks (SKIP LOCKED), so
+ * several instances never take the same booking and a payment saving at the same moment waits
+ * instead of racing. Tickets are released here, on the transition, and nowhere else: a booking that
+ * is no longer PENDING is never returned, so they cannot be released twice.
+ *
+ * <p>A booking with a payment in flight expires all the same; the payment saga notices when it
+ * tries to confirm and refunds the charge (ADR 0006).
  */
 public class ExpireBookingsService implements ExpireBookingsUseCase {
 
@@ -40,13 +44,17 @@ public class ExpireBookingsService implements ExpireBookingsUseCase {
 
   @Override
   public int expireDue(int batchSize) {
-    return transactions.execute(() -> expireBatch(batchSize));
+    int expired = 0;
+    while (expired < batchSize && transactions.execute(this::expireNext)) {
+      expired++;
+    }
+    return expired;
   }
 
-  private int expireBatch(int batchSize) {
-    List<Booking> due = bookings.findExpirable(clock.instant(), batchSize);
+  private boolean expireNext() {
+    List<Booking> due = bookings.findExpirable(clock.instant(), 1);
     due.forEach(this::expire);
-    return due.size();
+    return !due.isEmpty();
   }
 
   private void expire(Booking booking) {

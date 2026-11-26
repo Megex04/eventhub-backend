@@ -99,6 +99,7 @@ eventhub:
     hold-duration: 10m
     max-tickets: 6
     expiration:
+      enabled: true
       batch-size: 50
       poll-interval: 30s
     reconciler:

@@ -162,6 +162,16 @@ inmediato aunque su instante de orden vaya unos microsegundos por delante. Un pr
 Se aparta de `catalog-service`, que solo separa por un microsegundo los eventos de **una misma
 llamada**. Catalog no se modifica; el mismo riesgo existe alli y se anota para una decision aparte.
 
+### Expirar con un pago en curso
+
+El job de expiracion (`ExpirationJob` -> `expireDue`, una transaccion por reserva, `FOR UPDATE SKIP LOCKED`)
+**no sabe de pagos**: una reserva `PENDING` con el hold vencido expira aunque su cobro este en vuelo, y libera
+el inventario en esa misma transaccion. Cuando `pay` llega al paso 4, recarga la reserva, la ve `EXPIRED` y
+sigue el paso 5: reembolsa, pago `REFUNDED`, `BookingPaymentRefunded` y 409 `payment-refunded`. Si la
+expiracion toma el bloqueo mientras `pay` guarda, uno espera al otro y el resultado es el mismo. Si el proceso
+cae tras cobrar, el reconciliador resuelve el `INITIATED` huerfano con el mismo criterio. Esperar al pago
+alargaria la retencion del inventario por encima de `hold-duration`, que es lo que el cliente pidio acotar.
+
 ## Consecuencias
 
 - Tres transacciones cortas en lugar de una larga: mas piezas, pero ningun lock se mantiene durante una

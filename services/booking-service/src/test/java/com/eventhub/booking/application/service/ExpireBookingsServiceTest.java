@@ -54,6 +54,63 @@ class ExpireBookingsServiceTest {
   }
 
   @Test
+  void should_expire_each_booking_in_its_own_transaction() {
+    pendingBooking(1, 1);
+    pendingBooking(2, 1);
+    pendingBooking(3, 1);
+    env.clock.set(EXPIRES_AT);
+    int[] transactions = {0};
+    ExpireBookingsService counting =
+        new ExpireBookingsService(
+            new com.eventhub.booking.application.port.out.TransactionRunner() {
+              @Override
+              public <T> T execute(java.util.function.Supplier<T> work) {
+                transactions[0]++;
+                return env.tx.execute(work);
+              }
+            },
+            env.bookings,
+            env.inventory,
+            env.publisher,
+            env.clock);
+
+    assertThat(counting.expireDue(10)).isEqualTo(3);
+
+    // One per booking, plus the one that finds nothing left and ends the batch.
+    assertThat(transactions[0]).isEqualTo(4);
+  }
+
+  @Test
+  void should_keep_the_bookings_already_expired_when_a_later_one_fails() {
+    pendingBooking(1, 1);
+    pendingBooking(2, 1);
+    env.clock.set(EXPIRES_AT);
+    int[] published = {0};
+    ExpireBookingsService failingSecond =
+        new ExpireBookingsService(
+            env.tx,
+            env.bookings,
+            env.inventory,
+            events -> {
+              if (++published[0] == 2) {
+                throw new IllegalStateException("outbox down");
+              }
+              env.publisher.publish(events);
+            },
+            env.clock);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> failingSecond.expireDue(10))
+        .isInstanceOf(IllegalStateException.class);
+
+    long expired =
+        java.util.stream.LongStream.rangeClosed(1, 2)
+            .filter(id -> env.booking(uuid(id)).status() == BookingStatus.EXPIRED)
+            .count();
+    assertThat(expired).isEqualTo(1);
+    assertThat(env.reserved(VIP_ZONE)).isEqualTo(1);
+  }
+
+  @Test
   void should_expire_at_most_one_batch_per_call() {
     pendingBooking(1, 1);
     pendingBooking(2, 1);
