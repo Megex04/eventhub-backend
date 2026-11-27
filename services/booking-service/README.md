@@ -104,10 +104,10 @@ CAT=http://localhost:8081/api/v1
 STARTS=$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%SZ); ENDS=$(date -u -d '+30 days 4 hours' +%Y-%m-%dT%H:%M:%SZ)
 EVENT_ID=$(curl -s -X POST $CAT/events -H "Authorization: Bearer $ORG" -H "Content-Type: application/json" -d '{
   "title":"Rock Fest","venue":"Estadio Nacional","startsAt":"'$STARTS'","endsAt":"'$ENDS'"}' \
-  | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+  | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 ZONE_ID=$(curl -s -X POST $CAT/events/$EVENT_ID/zones -H "Authorization: Bearer $ORG" -H "Content-Type: application/json" \
   -d '{"name":"General","price":{"amount":"150.00","currency":"PEN"},"capacity":50}' \
-  | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+  | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 curl -s -X POST $CAT/events/$EVENT_ID/publish -H "Authorization: Bearer $ORG"
 ```
 
@@ -121,13 +121,13 @@ sleep 3; curl -s $BK/availability/$EVENT_ID                       # zonas con `a
 
 # reservar: Idempotency-Key obligatorio; los precios salen de la proyeccion, el usuario del token
 BOOKING_ID=$(curl -s -X POST $BK/bookings -H "Authorization: Bearer $CUS" -H "Content-Type: application/json" \
-  -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid)" \
+  -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)" \
   -d '{"eventId":"'$EVENT_ID'","items":[{"zoneId":"'$ZONE_ID'","quantity":2}]}' \
-  | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+  | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 curl -s $BK/bookings/$BOOKING_ID -H "Authorization: Bearer $CUS"  # PENDING, expiresAt a 10 min
 ```
 
-(En macOS usa `uuidgen` en lugar de `/proc/sys/kernel/random/uuid`.) Repetir la misma peticion con la
+(Sin `/proc` (macOS, Git Bash) cae a `uuidgen`; `scripts/e2e-smoke.sh` genera el UUID con `od` y funciona en cualquiera.) Repetir la misma peticion con la
 misma clave devuelve la misma reserva (200); la misma clave con otro cuerpo, 409 `idempotency-key-reuse`.
 
 ### 4. Pagar, ver el evento y cancelar
