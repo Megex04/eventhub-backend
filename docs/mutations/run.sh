@@ -19,11 +19,22 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 fi
 
 survivors=0
+applied=""
+
+# Always put the code back, whatever happens: the suite failing, Ctrl+C, kill, or an error here.
+restore() {
+  if [ -n "$applied" ]; then
+    git apply -R "$applied" 2>/dev/null || git checkout -- services/booking-service/src/main
+    applied=""
+  fi
+}
+trap restore EXIT
+trap 'restore; exit 130' INT TERM
 printf '| Mutation | Failing tests | Test classes that notice |\n|---|---|---|\n'
 
 for patch in docs/mutations/${1:-}*.patch; do
   name=$(basename "$patch" .patch)
-  git apply "$patch" || { echo "| $name | patch does not apply | |"; survivors=$((survivors + 1)); continue; }
+  git apply "$patch" && applied="$patch" || { echo "| $name | patch does not apply | |"; survivors=$((survivors + 1)); continue; }
 
   rm -rf "$REPORTS/surefire-reports" "$REPORTS/failsafe-reports"
   log=$(./mvnw -pl services/booking-service -am verify \
@@ -44,7 +55,7 @@ for patch in docs/mutations/${1:-}*.patch; do
     [ "$failing" -eq 0 ] && survivors=$((survivors + 1))
   fi
 
-  git apply -R "$patch"
+  restore
 done
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
