@@ -1,0 +1,411 @@
+openapi: 3.0.3
+info:
+  title: EventHub - Booking API
+  version: 1.0.0
+  description: |
+    API del `booking-service`. Fuente de verdad **contract-first**: los controllers
+    implementan las interfaces generadas desde este archivo.
+
+    Flujo: `POST /bookings` reserva (estado `PENDING`, inventario retenido hasta `expiresAt`);
+    `POST /bookings/{id}/pay` cobra mediante una pasarela **simulada** y confirma (`CONFIRMED`);
+    si no se paga a tiempo la reserva pasa a `EXPIRED` y el inventario se libera.
+
+    Reglas de negocio relevantes:
+    - Retencion de una reserva `PENDING`: 10 minutos (configurable en el servicio).
+    - Maximo 6 entradas **en total** por reserva; una misma zona no puede repetirse en `items`.
+    - Los precios los toma el servidor desde su proyeccion del catalogo; nunca el cliente.
+    - No se vende un evento cancelado ni uno que ya empezo.
+    - `pay` es idempotente: repetirlo sobre una reserva `CONFIRMED` devuelve la misma reserva y no cobra de nuevo.
+    - Si el pago se aprueba pero la reserva dejo de ser pagable mientras tanto (expiro o se cancelo),
+      el servicio **reembolsa** el pago y responde 409 con `type = payment-refunded`.
+    - Cancelar una reserva `CONFIRMED` (evento no iniciado) la cancela y reembolsa el pago.
+    - `userId` siempre sale del claim `sub` del JWT. Una reserva ajena responde 404.
+    - Fechas ISO-8601 UTC. Importes como string decimal con 2 decimales.
+    - El header `X-Correlation-Id` (UUID) es opcional: se propaga o se genera, y se devuelve en la respuesta.
+servers:
+  - url: http://localhost:8082
+    description: Local
+tags:
+  - name: Bookings
+  - name: Availability
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/bookings:
+    post:
+      tags: [Bookings]
+      operationId: createBooking
+      summary: Crear reserva (PENDING) y retener inventario
+      description: |
+        Requiere usuario autenticado. Exige `Idempotency-Key`: la misma clave con el mismo cuerpo
+        devuelve la reserva ya creada (200); la misma clave con un cuerpo distinto responde 409
+        (`type = idempotency-key-reuse`).
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateBookingRequest' }
+      responses:
+        '201':
+          description: Reserva creada
+          headers:
+            Location:
+              schema: { type: string, format: uri-reference }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingDetail' }
+        '200':
+          description: Reserva ya creada con esa Idempotency-Key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+    get:
+      tags: [Bookings]
+      operationId: listMyBookings
+      summary: Listar mis reservas
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/BookingStatus' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, -createdAt]
+            default: -createdAt
+      responses:
+        '200':
+          description: Pagina de reservas del usuario autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/bookings/{bookingId}:
+    parameters:
+      - $ref: '#/components/parameters/BookingId'
+    get:
+      tags: [Bookings]
+      operationId: getBooking
+      summary: Obtener detalle de una reserva propia
+      responses:
+        '200':
+          description: Detalle de la reserva
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/bookings/{bookingId}/pay:
+    parameters:
+      - $ref: '#/components/parameters/BookingId'
+    post:
+      tags: [Bookings]
+      operationId: payBooking
+      summary: Pagar una reserva PENDING (pasarela simulada)
+      description: |
+        Cobra el total mediante la pasarela de pago y, si se aprueba, confirma la reserva.
+        - Aprobado -> 200 con la reserva `CONFIRMED`.
+        - Rechazado -> 402 (`type = payment-declined`); la reserva sigue `PENDING` y se puede reintentar hasta que expire.
+        - Reserva ya `CONFIRMED` -> 200 con la misma reserva (idempotente, sin nuevo cobro).
+        - Reserva expirada o cancelada -> 409 sin cobrar.
+        - Pago aprobado pero la reserva dejo de ser pagable durante el cobro -> reembolso y 409 (`type = payment-refunded`).
+        El token de pago es opaco (`tok_...`); jamas se envian datos de tarjeta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayBookingRequest' }
+      responses:
+        '200':
+          description: Reserva confirmada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/bookings/{bookingId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/BookingId'
+    post:
+      tags: [Bookings]
+      operationId: cancelBooking
+      summary: Cancelar una reserva propia
+      description: |
+        Permitido para `PENDING` y para `CONFIRMED` cuyo evento no ha empezado. Libera el inventario.
+        Si estaba `CONFIRMED`, reembolsa el pago (el reembolso puede quedar `REFUND_PENDING` y reintentarse).
+        Emite `BookingCancelled` (y `BookingPaymentRefunded` cuando el reembolso se completa).
+      responses:
+        '200':
+          description: Reserva cancelada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/v1/availability/{eventId}:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Availability]
+      operationId: getEventAvailability
+      summary: Disponibilidad por zona de un evento (publico)
+      security: []
+      responses:
+        '200':
+          description: Disponibilidad actual segun la proyeccion local
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventAvailability' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Keycloak (local) o Microsoft Entra ID (Azure). Cualquier usuario autenticado puede reservar.
+
+  parameters:
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    BookingStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, EXPIRED, CANCELLED]
+
+    PaymentStatus:
+      type: string
+      enum: [CAPTURED, REFUND_PENDING, REFUNDED]
+
+    CancelReason:
+      type: string
+      enum: [USER_REQUEST, EVENT_CANCELLED]
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: string
+          pattern: '^\d{1,10}\.\d{2}$'
+          example: '150.00'
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          example: PEN
+
+    BookingItemRequest:
+      type: object
+      required: [zoneId, quantity]
+      properties:
+        zoneId: { type: string, format: uuid }
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 6
+
+    CreateBookingRequest:
+      type: object
+      required: [eventId, items]
+      properties:
+        eventId: { type: string, format: uuid }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 6
+          description: Zonas distintas; la suma de `quantity` no puede superar 6 (regla de negocio, 422).
+          items: { $ref: '#/components/schemas/BookingItemRequest' }
+
+    PayBookingRequest:
+      type: object
+      required: [paymentToken]
+      properties:
+        paymentToken:
+          type: string
+          pattern: '^tok_[A-Za-z0-9_]{1,60}$'
+          example: tok_approved
+          description: |
+            Token opaco de pago. En local la pasarela simulada aprueba cualquier token salvo `tok_declined`.
+            Nunca enviar datos de tarjeta.
+
+    BookingItem:
+      type: object
+      required: [zoneId, zoneName, quantity, unitPrice, subtotal]
+      properties:
+        zoneId: { type: string, format: uuid }
+        zoneName: { type: string }
+        quantity: { type: integer }
+        unitPrice: { $ref: '#/components/schemas/Money' }
+        subtotal: { $ref: '#/components/schemas/Money' }
+
+    Payment:
+      type: object
+      required: [id, status, amount]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/PaymentStatus' }
+        amount: { $ref: '#/components/schemas/Money' }
+
+    BookingDetail:
+      type: object
+      required: [id, eventId, status, items, total, createdAt, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/BookingStatus' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BookingItem' }
+        total: { $ref: '#/components/schemas/Money' }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        confirmedAt: { type: string, format: date-time }
+        expiredAt: { type: string, format: date-time }
+        cancelledAt: { type: string, format: date-time }
+        cancelReason: { $ref: '#/components/schemas/CancelReason' }
+        payment:
+          $ref: '#/components/schemas/Payment'
+
+    BookingSummary:
+      type: object
+      required: [id, eventId, status, total, createdAt, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/BookingStatus' }
+        total: { $ref: '#/components/schemas/Money' }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+
+    BookingPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/BookingSummary' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+
+    ZoneAvailability:
+      type: object
+      required: [zoneId, name, price, capacity, available]
+      properties:
+        zoneId: { type: string, format: uuid }
+        name: { type: string }
+        price: { $ref: '#/components/schemas/Money' }
+        capacity: { type: integer }
+        available:
+          type: integer
+          description: capacity menos entradas retenidas o vendidas (nunca negativo)
+
+    EventAvailability:
+      type: object
+      required: [eventId, onSale, startsAt, zones]
+      properties:
+        eventId: { type: string, format: uuid }
+        onSale:
+          type: boolean
+          description: false si el evento esta cancelado o ya empezo
+        startsAt: { type: string, format: date-time }
+        zones:
+          type: array
+          items: { $ref: '#/components/schemas/ZoneAvailability' }
+
+    ProblemDetail:
+      type: object
+      description: RFC 9457 (Problem Details). Content-Type `application/problem+json`.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference, example: 'https://eventhub.dev/problems/insufficient-inventory' }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        traceId: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+  responses:
+    BadRequest:
+      description: Peticion invalida (validacion de campos, Idempotency-Key ausente o malformada)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Unauthorized:
+      description: Falta token o es invalido
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    PaymentRequired:
+      description: Pago rechazado por la pasarela (`type = payment-declined`); la reserva sigue PENDING
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    NotFound:
+      description: Recurso inexistente (o reserva de otro usuario)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Conflict:
+      description: |
+        Conflicto con el estado actual: inventario insuficiente (`insufficient-inventory`),
+        reserva no pagable o no cancelable (`invalid-state`), pago reembolsado (`payment-refunded`),
+        reutilizacion de Idempotency-Key con otro cuerpo (`idempotency-key-reuse`) o version obsoleta.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    UnprocessableEntity:
+      description: |
+        Regla de negocio incumplida: mas de 6 entradas, zonas repetidas, zona inexistente en el evento,
+        evento no a la venta (cancelado o iniciado), cancelacion de una reserva confirmada de un evento ya iniciado.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }

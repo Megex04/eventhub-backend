@@ -1,0 +1,13 @@
+diff --git a/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java b/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java
+index e59f16d..a72835b 100644
+--- a/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java
++++ b/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java
+@@ -107,7 +107,7 @@ public class PayBookingService implements PayBookingUseCase {
+       return captured.booking();
+     }
+     // The captured state is committed: from here on the refund is best effort.
+-    if (refunds.settle(bookingId)) {
++    if (true) { // MUTATION: no compensating refund
+       throw new PaymentRefundedException();
+     }
+     metrics.immediateRefundFailed(bookingId);

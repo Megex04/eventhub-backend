@@ -203,3 +203,93 @@ hizo en M7):
 | Log del servicio | 0 lineas `ERROR` |
 
 Tras la prueba se bajo el stack con `docker compose down -v`.
+
+---
+
+# Auditoria de `booking-service`: reglas especificas del anexo de CLAUDE.md
+
+Fecha: 2026-11-26 · Estado del build: `./mvnw verify` en verde · Alcance: `booking-service`, anexo
+"booking-service: reglas especificas" de CLAUDE.md (las reglas generales de las secciones anteriores
+se aplican tambien a booking: hexagonal, dinero, tiempo, API REST, persistencia, ArchUnit). La leyenda es
+la de arriba. Medicion de cobertura (JaCoCo, lineas): dominio 99,7 %, aplicacion 96,3 %; ambas puertas
+(90 % y 80 %) pasan.
+
+## Inventario y concurrencia
+
+| Regla | Estado | Evidencia / justificacion |
+|---|---|---|
+| Inventario como proyeccion local; prohibido llamar a catalog para reservar | Cumple | Ninguna clase de `src/main` usa un cliente HTTP (`RestClient`, `WebClient`, `RestTemplate`...); la proyeccion la llena `CatalogEventsConsumer`. ADR 0005. |
+| Reservar es un `UPDATE` atomico, no leer-modificar-escribir | Cumple | `JdbcInventoryRepository.reserve`; `InventoryConcurrencyIT` (200 compradores por 20 entradas venden 20); `SchemaConstraintsIT` (el `CHECK` rechaza vender de mas). |
+| Liberar solo en la transicion, en la misma transaccion, nunca dos veces | Cumple | `ExpireBookingsServiceTest.should_release_the_tickets_only_once_however_many_times_the_job_runs`, `EventCancelledCascadeTest`; mutacion 03 (liberar dos veces) rompe 57 tests. |
+| Varias zonas: actualizar siempre por orden de `zoneId` | Cumple | `JdbcInventoryRepository.inZoneOrder`; `InventoryConcurrencyIT` mezcla cantidades y ordenes de zona sin deadlock. |
+| Invariante global `reserved` = suma(PENDING + CONFIRMED) y `0 <= reserved <= capacity` | Cumple | `RealApp.assertInventoryInvariant`, invocada por las pruebas de estres, `ExpirationJobIT`, `SagaRacesIT` y `SagaAssertions`. |
+
+## Proyeccion alimentada por eventos
+
+| Regla | Estado | Evidencia / justificacion |
+|---|---|---|
+| Consumidores idempotentes en dos niveles (`processed_message` y upserts por clave de negocio) | Cumple | `EventConsumersTest`, `CatalogEventsConsumerIT` (duplicado con el broker pausado y reanudado; mismo `messageId` con otro contenido); mutacion "ignorar `processed_message`" rompe `EventCancelledCascadeTest`. |
+| Una reemision no reinicia `reserved` ni reabre un evento `CANCELLED` | Cumple | `CatalogEventsConsumerIT.should_keep_what_is_reserved_when_catalog_replays_the_publication` y `..._not_reopen_a_cancelled_event_...`. |
+| Proyeccion monotona (`last_occurred_at`); `CANCELLED` es terminal | Cumple | `EventProjectionTest`, `CatalogEventsConsumerIT` (fuera de orden y tombstone). |
+| `EventCancelled` cancela, libera y reembolsa las reservas del evento | Cumple (con matiz) | `EventCancelledCascadeTest`, `CatalogEventsConsumerIT`. **Matiz:** la cascada deja el reembolso en `REFUND_PENDING` y lo termina el reconciliador; el consumidor nunca llama a la pasarela (ADR 0008). |
+| Cola y DLQ declaradas al arrancar; venenoso -> reintentos -> DLQ; nunca bloquear la cola | Cumple (con matiz) | `CatalogEventsConsumerIT` (topologia, venenosos a la DLQ sin bloquear al siguiente, 5 intentos). **Matiz:** el reintento en proceso retiene la cola hasta 15 s (README, "Limitaciones"). |
+
+## Reservas
+
+| Regla | Estado | Evidencia / justificacion |
+|---|---|---|
+| Estados y transiciones; `EXPIRED` y `CANCELLED` terminales | Cumple | `BookingStateMachineTest`, `BookingTimeBoundaryTest`. |
+| Retencion 10 min y maximo 6 entradas configurables, sin constantes magicas en el dominio | Cumple | `BookingProperties` (validado al arrancar), `BookingPolicy` inyectada; `BookingPropertiesTest`. |
+| `Idempotency-Key` obligatorio, unico por `(user_id, key)`; mismo cuerpo -> 200, otro cuerpo -> 409 | Cumple | `BookingApiIT` (400 sin clave, 409 `idempotency-key-reuse`), `CreateBookingServiceTest` (la misma clave en paralelo, una reserva), `TransactionBoundariesIT` (16 peticiones, una reserva), `SchemaConstraintsIT`, `RequestFingerprintTest`. |
+| Precios desde la proyeccion; `userId` del `sub`; reserva ajena -> 404 | Cumple | `CreateBookingServiceTest`, `CurrentUserTest`, `BookingApiIT.should_answer_404_to_get_pay_and_cancel_when_the_booking_belongs_to_someone_else`. |
+| Expiracion por job con `SKIP LOCKED`, por lotes, segura con varias instancias, `Clock` inyectado | Cumple | `ExpireBookingsServiceTest` (una transaccion por reserva), `ExpirationJobIT` (dos instancias sin solaparse), `TransactionBoundariesIT`; regla ArchUnit `nothing_reads_the_system_clock`. |
+
+## Pagos (simulados) y reembolsos
+
+| Regla | Estado | Evidencia / justificacion |
+|---|---|---|
+| Puerto `PaymentGateway` con `charge` y `refund` idempotentes por `paymentId` | Cumple | `SimulatedPaymentGatewayTest`, `PayBookingServiceTest.should_use_the_payment_id_as_the_gateway_key_...`. |
+| Adaptador falso solo en `local`/`dev`/`test`; produccion sin pasarela real debe fallar | Cumple | `ContextStartupIT` (no arranca sin pasarela real fuera de esos perfiles, ni en un perfil desconocido); regla ArchUnit `gateway_implementations_live_in_the_payment_adapter_under_a_profile`. |
+| Nunca recibir, loguear ni guardar datos de tarjeta; solo tokens `tok_...` | Parcial | El OpenAPI valida `^tok_[A-Za-z0-9_]{1,60}$`; el token se borra del pago al cobrar y un `CHECK` impide guardarlo fuera de `INITIATED` (`SchemaConstraintsIT`). "No loguear" es revision manual: sin test automatico. |
+| Flujo `pay` en mini-saga: cobro fuera de la transaccion, una sola intencion activa, reembolso si ya no es pagable | Cumple | `PayBookingServiceTest` (`InstrumentedGateway` comprueba que `charge` no corre dentro de una transaccion), `TransactionBoundariesIT`, `SchemaConstraintsIT` (indice unico parcial); ADR 0006. |
+| Reconciliador de `REFUND_PENDING` y de `INITIATED` huerfanos, con backoff, metrica y alerta | Cumple | `ReconcileRefundsServiceTest`, `ReconcilerJobIT`, `SagaBacklogMetricsIT` (`refund_pending`, `initiated_stale`, `bookings.pending.overdue`). |
+| Garantia exacta en toda carrera pago vs expiracion, con pasarela controlable y sin `sleep` | Cumple | `SagaRacesIT`: 9 carreras, cada una repetida 10 veces, `assertConsistent` tras cada una. Tres mutaciones (`docs/mutations`) rompen 49, 71 y 57 tests. |
+
+## Contratos, mensajeria y seguridad
+
+| Regla | Estado | Evidencia / justificacion |
+|---|---|---|
+| Contratos `booking-api.yaml` y `booking-*.v1`; no modificarlos sin avisar | Cumple | `OpenApiConformanceIT`, `BookingEventSchemaContractTest`; `contracts/` no se ha tocado salvo avisando (commit `5c1ad74`, el 400 de las rutas con UUID). |
+| Outbox replicado de catalog; sin libreria compartida todavia; si `libs/contract-testing` | Cumple | ADR 0007 (diferencias medidas entre las dos copias y criterio de extraccion). |
+| `messageId` = id de la fila de outbox | Cumple | `BookingEventsEndToEndIT.should_use_the_row_ids_as_message_ids_...`. |
+| Cualquier usuario autenticado puede reservar; disponibilidad publica | Cumple | `BookingApiIT` (401 sin token; disponibilidad sin token), `BookingListingIT`. |
+| `management` de Actuator fuera del puerto publico en perfiles no locales | Cumple | `ManagementPortIT`. |
+
+## Desviaciones y deuda abierta de booking
+
+1. **Nombres de tests**: unos 250 tests de booking (en su mayoria unitarios y de dominio) no llevan la parte
+   `_when_` del convenio `should_<resultado>_when_<condicion>`. `TestConventionsTest` congela esa deuda
+   (`src/test/resources/archunit_store`): lo existente se tolera y **cualquier test nuevo que incumpla el
+   convenio rompe el build**. Se renombran al tocarlos. Catalog no tiene deuda y aplica la regla estricta.
+2. **Soporte de test duplicado** con catalog (`SharedPostgres`, `SharedRabbit`, `ControllableOutboxBroker`,
+   `TestOutboxSettings`, `TestTokens`) y outbox replicado: extraccion planificada al tercer usuario
+   (ADR 0007).
+3. **Revisiones manuales sin chequeo automatico**: no loguear datos de tarjeta ni personales, controllers
+   sin logica, longitud de metodos, "un concepto por test".
+4. **Reintento en proceso que retiene la cola** hasta 15 s, **eventos no enrutables** y **pago en curso que
+   bloquea `pay`** ~3 min: limitaciones documentadas en el README del servicio, no defectos ocultos.
+5. Los eventos de booking aun no tienen consumidor (notification-service es posterior).
+
+## Prueba desde cero de booking (B8)
+
+Ejecutada el 2026-11-26 sobre el commit `47313aa`: `docker compose down -v`, `git clone` en una carpeta nueva y
+repositorio Maven aislado (`-Dmaven.repo.local`, vacio).
+
+| Paso | Resultado |
+|---|---|
+| `./mvnw clean verify` en el clon | **BUILD SUCCESS** en 6:54 min. Surefire: catalog 244 + 148, booking 320 + 172, contract-testing 7. Failsafe: catalog 238, booking 315 |
+| `scripts/e2e-smoke.sh` en el clon (arranca catalog y booking desde los jar) | 25 comprobaciones, 0 fallos: flujo completo y consumidor tardio con `POST /actuator/replay` |
+| Tres `./mvnw clean verify` seguidos en la raiz | los tres **BUILD SUCCESS** (5:34, 4:06 y 4:03 min), mismos totales |
+| `git ls-files` | sin `.env`, claves ni certificados; solo `.env.example` y el realm de Keycloak de desarrollo |
+
+Matiz: los totales de catalog subieron de 241 a 244 unitarios por las reglas ArchUnit nuevas del hito B8.

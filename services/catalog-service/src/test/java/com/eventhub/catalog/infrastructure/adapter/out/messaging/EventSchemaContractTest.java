@@ -6,7 +6,7 @@ import com.eventhub.catalog.domain.DomainEvent;
 import com.eventhub.catalog.domain.Event;
 import com.eventhub.catalog.domain.Money;
 import com.eventhub.catalog.domain.TicketZone;
-import com.eventhub.catalog.support.EventSchemas;
+import com.eventhub.contracttesting.EventSchemas;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

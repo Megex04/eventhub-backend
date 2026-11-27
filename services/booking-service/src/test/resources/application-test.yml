@@ -1,0 +1,13 @@
+# The test profile serves the actuator on the same port as the API, as the local profile does, so
+# MockMvc can reach it. The separate management port is exercised by ManagementPortIT.
+management:
+  server:
+    port: 8082
+
+# No background jobs in tests: they call the use cases themselves, so nothing happens behind their back.
+eventhub:
+  booking:
+    expiration:
+      enabled: false
+    reconciler:
+      enabled: false

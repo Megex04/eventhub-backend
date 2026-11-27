@@ -1,0 +1,29 @@
+diff --git a/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java b/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java
+index e59f16d..efc76f1 100644
+--- a/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java
++++ b/services/booking-service/src/main/java/com/eventhub/booking/application/service/PayBookingService.java
+@@ -68,13 +68,22 @@ public class PayBookingService implements PayBookingUseCase {
+ 
+   @Override
+   public Booking pay(PayBookingCommand command) {
+-    Started started = VersionRetry.run(transactions, () -> begin(command));
++    // MUTATION: the gateway is called inside the transaction that records the intention.
++    record Charged(Started started, ChargeResult result) {}
++    Charged charged =
++        VersionRetry.run(
++            transactions,
++            () -> {
++              Started began = begin(command);
++              return new Charged(began, began.alreadyConfirmed() ? null : charge(began.payment()));
++            });
++    Started started = charged.started();
+     if (started.alreadyConfirmed()) {
+       return started.booking();
+     }
+     Payment payment = started.payment();
+     UUID bookingId = started.booking().id();
+-    return switch (charge(payment)) {
++    return switch (charged.result()) {
+       case ChargeResult.Approved approved -> applyApproval(bookingId, payment.id());
+       case ChargeResult.Declined declined -> applyDecline(bookingId, payment.id());
+     };

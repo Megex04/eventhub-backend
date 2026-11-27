@@ -6,8 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.eventhub.catalog.support.EventSchemas;
 import com.eventhub.catalog.support.TestTokens;
+import com.eventhub.contracttesting.EventSchemas;
 import com.jayway.jsonpath.JsonPath;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

@@ -8,9 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.atlassian.oai.validator.OpenApiInteractionValidator;
-import com.atlassian.oai.validator.report.LevelResolver;
-import com.atlassian.oai.validator.report.ValidationReport.Level;
-import java.nio.file.Path;
+import com.eventhub.contracttesting.OpenApiContracts;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -28,23 +26,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  */
 class OpenApiConformanceIT extends WebIntegrationTest {
 
-  // Read from the contract itself, never copied into the module.
-  private static final String SPEC =
-      Path.of("../../contracts/openapi/catalog-api.yaml")
-          .toAbsolutePath()
-          .normalize()
-          .toUri()
-          .toString();
-
   private static final OpenApiInteractionValidator VALIDATOR =
-      OpenApiInteractionValidator.createFor(SPEC)
-          .withLevelResolver(
-              LevelResolver.create()
-                  .withLevel("validation.request.body", Level.IGNORE)
-                  .withLevel("validation.request.parameter", Level.IGNORE)
-                  .withLevel("validation.request.security", Level.IGNORE)
-                  .build())
-          .build();
+      OpenApiContracts.validatorFor("catalog-api.yaml");
 
   private static final String NO_SUCH = "00000000-0000-4000-8000-000000000000";
 

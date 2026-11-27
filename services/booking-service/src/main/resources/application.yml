@@ -1,0 +1,157 @@
+spring:
+  application:
+    name: booking-service
+  threads:
+    virtual:
+      enabled: true
+  # Connection settings come from the environment; the password has no default on purpose.
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jackson:
+    # Optional fields (confirmedAt, cancelReason, payment) are absent rather than null.
+    default-property-inclusion: non_null
+  # Broker connection comes from the environment; credentials have no default on purpose.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASSWORD}
+    # The relay marks a row published only after the broker confirmed it.
+    publisher-confirm-type: correlated
+    # An unresponsive broker must fail an attempt, not hang the relay while it holds row locks.
+    connection-timeout: 5s
+    channel-rpc-timeout: 5s
+  cloud:
+    function:
+      definition: catalogEvents
+    stream:
+      bindings:
+        outbox-out-0:
+          destination: eventhub.events
+        # The one consumer of the catalog events (ADR 0008): one queue, three routing keys.
+        catalogEvents-in-0:
+          destination: eventhub.events
+          group: booking-catalog-events
+          consumer:
+            concurrency: 1
+            # Retries happen in process, with backoff; when they run out the message is republished
+            # to the dead-letter queue. A poison message is not retried: it can never succeed.
+            max-attempts: 5
+            back-off-initial-interval: 1000
+            back-off-multiplier: 2.0
+            back-off-max-interval: 30000
+            retryable-exceptions:
+              com.eventhub.booking.infrastructure.adapter.in.messaging.PoisonMessageException: false
+      rabbit:
+        bindings:
+          outbox-out-0:
+            producer:
+              exchange-type: topic
+              # <service>.<aggregate>.<event>.v<version>, set per message by the relay.
+              routing-key-expression: headers['routingKey']
+              use-confirm-header: true
+          catalogEvents-in-0:
+            consumer:
+              exchange-type: topic
+              # The queue is named after the group alone: booking-catalog-events (and its .dlq).
+              queue-name-group-only: true
+              binding-routing-key: catalog.event.published.v1,catalog.event.rescheduled.v1,catalog.event.cancelled.v1
+              binding-routing-key-delimiter: ","
+              auto-bind-dlq: true
+              dead-letter-queue-name: booking-catalog-events.dlq
+              republish-to-dlq: true
+              requeue-rejected: false
+              # One message at a time keeps the order of what catalog sent.
+              prefetch: 1
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keys are discovered from the issuer (lazily, on the first token). No default on purpose.
+          issuer-uri: ${OIDC_ISSUER_URI}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema belongs to Flyway; Hibernate only checks that entities match it.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+server:
+  port: 8082
+
+# Tunables of the service (see BookingProperties). Validated at startup: a bad value stops it.
+eventhub:
+  # Outbox relay (see OutboxProperties). The poller can be switched off with enabled: false.
+  outbox:
+    enabled: true
+    batch-size: 50
+    poll-interval: 1s
+    max-attempts: 10
+    initial-backoff: 2s
+    max-backoff: 5m
+    confirm-timeout: 5s
+  booking:
+    hold-duration: 10m
+    max-tickets: 6
+    expiration:
+      enabled: true
+      batch-size: 50
+      poll-interval: 30s
+    reconciler:
+      enabled: true
+      initiated-stale-after: 2m
+      initial-backoff: 30s
+      max-backoff: 10m
+      batch-size: 20
+      poll-interval: 1m
+    cascade:
+      batch-size: 100
+
+management:
+  server:
+    # Actuator on its own port, away from the public API. The local and test profiles put it
+    # back on the server port so it is easy to reach and to test.
+    port: 8083
+  tracing:
+    # traceId/spanId reach the logging context and the problem+json bodies. Nothing is exported
+    # unless an operator turns an exporter on and gives it an endpoint.
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+
+# Structured JSON logs (traceId/correlationId are added via MDC).
+logging:
+  structured:
+    format:
+      console: logstash

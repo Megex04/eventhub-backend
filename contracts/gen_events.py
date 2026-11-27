@@ -14,7 +14,9 @@ BASE = "https://eventhub.dev/schemas/events/"
 
 
 def write(name, schema):
-    (OUT / name).write_text(json.dumps(schema, indent=2, ensure_ascii=False) + "\n")
+    (OUT / name).write_text(
+        json.dumps(schema, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8", newline="\n")
 
 
 uuid = {"type": "string", "format": "uuid"}
@@ -142,8 +144,9 @@ event("booking-created.v1.schema.json", "BookingCreated", "booking-service",
 
 event("booking-confirmed.v1.schema.json", "BookingConfirmed", "booking-service",
       "booking.booking.confirmed.v1",
-      data(["bookingId", "userId", "eventId", "total", "confirmedAt"], {
-          "bookingId": uuid, "userId": uuid, "eventId": uuid, "total": money, "confirmedAt": dt,
+      data(["bookingId", "userId", "eventId", "paymentId", "total", "confirmedAt"], {
+          "bookingId": uuid, "userId": uuid, "eventId": uuid, "paymentId": uuid,
+          "total": money, "confirmedAt": dt,
       }),
       "Reserva confirmada (pago simulado aprobado).")
 
@@ -162,5 +165,15 @@ event("booking-cancelled.v1.schema.json", "BookingCancelled", "booking-service",
           "cancelledAt": dt,
       }),
       "Reserva cancelada por el usuario o por cancelacion del evento; inventario liberado.")
+
+event("booking-payment-refunded.v1.schema.json", "BookingPaymentRefunded", "booking-service",
+      "booking.booking.payment-refunded.v1",
+      data(["bookingId", "userId", "eventId", "paymentId", "amount", "reason", "refundedAt"], {
+          "bookingId": uuid, "userId": uuid, "eventId": uuid, "paymentId": uuid, "amount": money,
+          "reason": {"type": "string",
+                     "enum": ["BOOKING_EXPIRED_DURING_PAYMENT", "BOOKING_CANCELLED", "EVENT_CANCELLED"]},
+          "refundedAt": dt,
+      }),
+      "Se reembolso un pago: la reserva dejo de ser pagable durante el cobro, o se cancelo una reserva CONFIRMED.")
 
 print("Esquemas generados en", OUT)
