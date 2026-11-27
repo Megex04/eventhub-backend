@@ -10,19 +10,20 @@ import com.eventhub.booking.application.port.out.FakePaymentGateway;
 import com.eventhub.booking.domain.RequestedItem;
 import com.eventhub.booking.support.PersistenceIT;
 import com.eventhub.booking.support.RealApp;
+import com.eventhub.booking.support.ScheduledJobs;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
 /** The reconciler job on the real scheduler: it finishes what the request path left behind. */
 @PersistenceIT
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestPropertySource(
     properties = {
       "eventhub.booking.reconciler.enabled=true",
@@ -31,11 +32,17 @@ import org.springframework.test.context.TestPropertySource;
       "eventhub.booking.reconciler.initial-backoff=1s",
       "eventhub.booking.reconciler.max-backoff=10s"
     })
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ReconcilerJobIT {
 
   @Autowired private ApplicationContext context;
   @Autowired private FakePaymentGateway gateway;
   private RealApp app;
+
+  @AfterAll
+  void stopTheJobs() {
+    ScheduledJobs.cancelAll(context);
+  }
 
   @BeforeEach
   void wire() {

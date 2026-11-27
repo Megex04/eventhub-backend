@@ -10,32 +10,39 @@ import com.eventhub.booking.domain.RequestedItem;
 import com.eventhub.booking.support.Concurrently;
 import com.eventhub.booking.support.PersistenceIT;
 import com.eventhub.booking.support.RealApp;
+import com.eventhub.booking.support.ScheduledJobs;
 import java.time.Duration;
 import java.util.List;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
 /**
  * The expiration job on the real scheduler, and two instances of the use case side by side. The
- * context is closed afterwards: its properties are its own, and a cached copy would keep a
- * connection pool (and the scheduler) alive for the rest of the run.
+ * context stays cached (its properties are its own), so the jobs are cancelled when the class ends;
+ * the pool is bounded by the test profile (SharedPostgres).
  */
 @PersistenceIT
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestPropertySource(
     properties = {
       "eventhub.booking.expiration.enabled=true",
       "eventhub.booking.expiration.poll-interval=100ms",
       "eventhub.booking.expiration.batch-size=7"
     })
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ExpirationJobIT {
 
   @Autowired private ApplicationContext context;
   private RealApp app;
+
+  @AfterAll
+  void stopTheJobs() {
+    ScheduledJobs.cancelAll(context);
+  }
 
   @BeforeEach
   void wire() {
