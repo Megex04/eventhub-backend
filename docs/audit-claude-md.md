@@ -279,3 +279,17 @@ la de arriba. Medicion de cobertura (JaCoCo, lineas): dominio 99,7 %, aplicacion
 4. **Reintento en proceso que retiene la cola** hasta 15 s, **eventos no enrutables** y **pago en curso que
    bloquea `pay`** ~3 min: limitaciones documentadas en el README del servicio, no defectos ocultos.
 5. Los eventos de booking aun no tienen consumidor (notification-service es posterior).
+
+## Prueba desde cero de booking (B8)
+
+Ejecutada el 2026-11-26 sobre el commit `47313aa`: `docker compose down -v`, `git clone` en una carpeta nueva y
+repositorio Maven aislado (`-Dmaven.repo.local`, vacio).
+
+| Paso | Resultado |
+|---|---|
+| `./mvnw clean verify` en el clon | **BUILD SUCCESS** en 6:54 min. Surefire: catalog 244 + 148, booking 320 + 172, contract-testing 7. Failsafe: catalog 238, booking 315 |
+| `scripts/e2e-smoke.sh` en el clon (arranca catalog y booking desde los jar) | 25 comprobaciones, 0 fallos: flujo completo y consumidor tardio con `POST /actuator/replay` |
+| Tres `./mvnw clean verify` seguidos en la raiz | los tres **BUILD SUCCESS** (5:34, 4:06 y 4:03 min), mismos totales |
+| `git ls-files` | sin `.env`, claves ni certificados; solo `.env.example` y el realm de Keycloak de desarrollo |
+
+Matiz: los totales de catalog subieron de 241 a 244 unitarios por las reglas ArchUnit nuevas del hito B8.
