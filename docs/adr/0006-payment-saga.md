@@ -1,6 +1,6 @@
 # 0006. Mini-saga de pago y reembolso (y por que se cobra fuera de la transaccion)
 
-- Estado: aceptada (se completa en el hito B8 con la evidencia de las carreras de B7)
+- Estado: aceptada
 - Fecha: 2026-11-25
 - Alcance: `booking-service`
 
@@ -202,3 +202,14 @@ alargaria la retencion del inventario por encima de `hold-duration`, que es lo q
 - Mutaciones comprobadas: quitar el reembolso compensatorio de `pay` (fallan 4 tests), quitar el
   registro de backoff del reconciliador (fallan 3), romper la resolucion de huerfanos aprobados
   (fallan 6), liberar el inventario dos veces en la cascada (fallan 8).
+- Carreras de B7 (`SagaRacesIT`, PostgreSQL real, cada una repetida 10 veces, sin `sleep`): cobro aprobado
+  justo al expirar, cancelacion del usuario y del evento durante el cobro, rechazo y reintento, `pay`
+  repetido, fallo del reembolso hasta que lo termina el reconciliador, caida entre el cobro y el paso 3
+  (se confirma o se reembolsa), reconciliador contra el paso 3 de `pay` sobre el mismo pago, y expiracion
+  contra un `create` en la misma zona. `SagaAssertions.assertConsistent` comprueba tras cada una la
+  garantia: confirmada con pago `CAPTURED`, inventario retenido y un `BookingConfirmed`; o expirada o
+  cancelada con pago `REFUNDED` (o `REFUND_PENDING` hasta el reconciliador), inventario liberado y un
+  `BookingPaymentRefunded`.
+- Mutaciones reproducibles con `docs/mutations/run.sh` (tabla en `docs/mutations/README.md`): sin
+  reembolso compensatorio (49 tests fallan), cobro dentro de la transaccion (71), inventario liberado
+  dos veces (57).
