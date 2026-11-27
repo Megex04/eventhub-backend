@@ -233,6 +233,54 @@ class ArchitectureTest {
           .should(notCatchExceptionOrThrowable())
           .because("catch the specific failures; an @ExceptionHandler is the place for the rest");
 
+  // ---- extra rules (B8) ----
+
+  /** The application layer knows Spring only through {@code @Service}/{@code @Transactional}. */
+  @ArchTest
+  static final ArchRule application_has_no_spring_beyond_stereotype_and_transactional =
+      noClasses()
+          .that()
+          .resideInAPackage("..application..")
+          .should()
+          .dependOnClassesThat(
+              JavaClass.Predicates.resideInAPackage("org.springframework..")
+                  .and(
+                      DescribedPredicate.not(
+                          JavaClass.Predicates.resideInAnyPackage(
+                              "org.springframework.stereotype..",
+                              "org.springframework.transaction.annotation.."))))
+          .because("CLAUDE.md: application depends only on domain and its own ports");
+
+  /**
+   * Correlation travels through a port ({@code CorrelationIdProvider}); MDC is an adapter detail.
+   */
+  @ArchTest
+  static final ArchRule application_never_touches_the_logging_context =
+      noClasses()
+          .that()
+          .resideInAPackage("..application..")
+          .should()
+          .dependOnClassesThat()
+          .haveFullyQualifiedName("org.slf4j.MDC");
+
+  /** Not only domain and application: nothing in the service reads the system clock. */
+  @ArchTest
+  static final ArchRule nothing_reads_the_system_clock =
+      noClasses()
+          .should()
+          .callMethod(Instant.class, "now")
+          .orShould()
+          .callMethod(LocalDate.class, "now")
+          .orShould()
+          .callMethod(LocalDateTime.class, "now")
+          .orShould()
+          .callMethod(OffsetDateTime.class, "now")
+          .orShould()
+          .callMethod(ZonedDateTime.class, "now")
+          .orShould()
+          .callMethod(System.class, "currentTimeMillis")
+          .because("CLAUDE.md: inject java.time.Clock");
+
   private static DescribedPredicate<JavaMethod> areNotSynthetic() {
     return DescribedPredicate.describe(
         "are not synthetic", method -> !method.getModifiers().contains(JavaModifier.SYNTHETIC));
